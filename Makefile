@@ -1,6 +1,6 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
 #
-# Generated on 2025-01-16T11:42:04Z by kres 3b3f992.
+# Generated on 2025-03-17T03:07:40Z by kres ec5ec04.
 
 # common variables
 
@@ -17,19 +17,20 @@ WITH_RACE ?= false
 REGISTRY ?= ghcr.io
 USERNAME ?= siderolabs
 REGISTRY_AND_USERNAME ?= $(REGISTRY)/$(USERNAME)
-PROTOBUF_GO_VERSION ?= 1.36.2
+PROTOBUF_GO_VERSION ?= 1.36.5
 GRPC_GO_VERSION ?= 1.5.1
-GRPC_GATEWAY_VERSION ?= 2.25.1
+GRPC_GATEWAY_VERSION ?= 2.26.3
 VTPROTOBUF_VERSION ?= 0.6.0
-GOIMPORTS_VERSION ?= 0.29.0
+GOIMPORTS_VERSION ?= 0.31.0
 DEEPCOPY_VERSION ?= v0.5.6
-GOLANGCILINT_VERSION ?= v1.63.4
+GOLANGCILINT_VERSION ?= v1.64.6
 GOFUMPT_VERSION ?= v0.7.0
-GO_VERSION ?= 1.23.4
+GO_VERSION ?= 1.24.1
 GO_BUILDFLAGS ?=
 GO_LDFLAGS ?=
 CGO_ENABLED ?= 0
 GOTOOLCHAIN ?= local
+GOEXPERIMENT ?= synctest
 TESTPKGS ?= ./...
 KRES_IMAGE ?= ghcr.io/siderolabs/kres:latest
 CONFORMANCE_IMAGE ?= ghcr.io/siderolabs/conform:latest
@@ -69,10 +70,14 @@ COMMON_ARGS += --build-arg=DEEPCOPY_VERSION="$(DEEPCOPY_VERSION)"
 COMMON_ARGS += --build-arg=GOLANGCILINT_VERSION="$(GOLANGCILINT_VERSION)"
 COMMON_ARGS += --build-arg=GOFUMPT_VERSION="$(GOFUMPT_VERSION)"
 COMMON_ARGS += --build-arg=TESTPKGS="$(TESTPKGS)"
-TOOLCHAIN ?= docker.io/golang:1.23-alpine
+COMMON_ARGS += --build-arg=PKGS_PREFIX="$(PKGS_PREFIX)"
+COMMON_ARGS += --build-arg=PKGS="$(PKGS)"
+TOOLCHAIN ?= docker.io/golang:1.24-alpine
 
 # extra variables
 
+PKGS_PREFIX ?= ghcr.io/siderolabs
+PKGS ?= v1.10.0-alpha.0-49-g347ad26
 RUN_TESTS ?= TestIntegration
 TEST_FLAGS ?=
 
@@ -138,7 +143,7 @@ else
 GO_LDFLAGS += -s
 endif
 
-all: unit-tests image-factory image-image-factory integration.test integration tailwind lint
+all: unit-tests image-factory image-image-factory imager-base imager-tools integration.test integration tailwind lint
 
 $(ARTIFACTS):  ## Creates artifacts directory.
 	@mkdir -p $(ARTIFACTS)
@@ -225,6 +230,12 @@ lint: lint-golangci-lint lint-gofumpt lint-govulncheck lint-markdown  ## Run all
 image-image-factory: tailwind  ## Builds image for image-factory.
 	@$(MAKE) registry-$@ IMAGE_NAME="image-factory"
 
+.PHONY: imager-base
+imager-base:
+
+.PHONY: imager-tools
+imager-tools:
+
 .PHONY: integration.test
 integration.test:
 	@$(MAKE) local-$@ DEST=$(ARTIFACTS)
@@ -237,7 +248,7 @@ integration: integration.test
 
 .PHONY: tailwind
 tailwind:
-	@$(MAKE) local-tailwind-copy PUSH=false DEST=. PLATFORM=linux/amd64 BUILDKIT_MULTI_PLATFORM=0
+	@$(MAKE) local-tailwind-copy PUSH=false DEST=. PLATFORM=$(OPERATING_SYSTEM)/$(GOARCH)
 
 .PHONY: rekres
 rekres:

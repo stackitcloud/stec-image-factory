@@ -24,6 +24,10 @@ type Options struct { //nolint:govet
 
 	// Asset builder options: minimum supported Talos version.
 	MinTalosVersion string
+	// Whether to skip beta/alpha versions and such when obtaining valid Talos versions
+	SkipVersionFilter bool
+	// Replace the image registry defined in the extension/overlay image with the one defined here
+	OverrideSourceImageRegistry string
 	// Image registry for source images: imager, extensions, etc..
 	ImageRegistry string
 	// Allow insecure connection to the image registry
@@ -152,8 +156,9 @@ type ImageOptions struct {
 var DefaultOptions = Options{
 	HTTPListenAddr: ":8080",
 
-	MinTalosVersion: "1.2.0",
-	ImageRegistry:   "ghcr.io",
+	MinTalosVersion:   "1.2.0",
+	SkipVersionFilter: false,
+	ImageRegistry:     "ghcr.io",
 
 	RegistryRefreshInterval: 5 * time.Minute,
 
@@ -175,6 +180,8 @@ var DefaultOptions = Options{
 
 	CacheRepository: "ghcr.io/siderolabs/image-factory/cache",
 	CacheS3Bucket:   "image-factory",
+
+	OverrideSourceImageRegistry: "",
 
 	MetricsListenAddr: ":2122",
 

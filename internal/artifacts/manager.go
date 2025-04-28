@@ -29,12 +29,13 @@ import (
 
 // Manager supports loading, caching and serving Talos release artifacts.
 type Manager struct { //nolint:govet
-	options        Options
-	storagePath    string
-	schematicsPath string
-	logger         *zap.Logger
-	imageRegistry  name.Registry
-	pullers        map[Arch]remotewrap.Puller
+	options               Options
+	storagePath           string
+	schematicsPath        string
+	logger                *zap.Logger
+	imageRegistry         name.Registry
+	overrideImageRegistry name.Registry
+	pullers               map[Arch]remotewrap.Puller
 
 	sf singleflight.Group
 
@@ -69,6 +70,13 @@ func NewManager(logger *zap.Logger, options Options) (*Manager, error) {
 	if options.InsecureImageRegistry {
 		opts = append(opts, name.Insecure)
 	}
+	overrideImageRegistry := name.Registry{}
+	if len(options.OverrideSourceImageRegistry) > 0 {
+		overrideImageRegistry, err = name.NewRegistry(options.OverrideSourceImageRegistry, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse image registry: %w", err)
+		}
+	}
 
 	imageRegistry, err := name.NewRegistry(options.ImageRegistry, opts...)
 	if err != nil {
@@ -96,12 +104,13 @@ func NewManager(logger *zap.Logger, options Options) (*Manager, error) {
 	}
 
 	return &Manager{
-		options:        options,
-		storagePath:    tmpDir,
-		schematicsPath: schematicsPath,
-		logger:         logger,
-		imageRegistry:  imageRegistry,
-		pullers:        pullers,
+		options:               options,
+		storagePath:           tmpDir,
+		schematicsPath:        schematicsPath,
+		logger:                logger,
+		imageRegistry:         imageRegistry,
+		overrideImageRegistry: overrideImageRegistry,
+		pullers:               pullers,
 	}, nil
 }
 

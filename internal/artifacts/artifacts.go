@@ -25,6 +25,8 @@ type Options struct { //nolint:govet
 	MinVersion semver.Version
 	// SkipVersionFilter indicated whether obtained Talos versions should be filtered
 	SkipVersionFilter bool
+	// Replace the image registry defined in the extension/overlay image with the one defined here
+	OverrideSourceImageRegistry string
 	// ImageVerifyOptions are the options for verifying the image signature.
 	ImageVerifyOptions []cosign.CheckOpts
 	// TalosVersionRecheckInterval is the interval for rechecking Talos versions.

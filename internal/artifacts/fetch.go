@@ -91,6 +91,13 @@ func (m *Manager) fetchImageByTag(imageName, tag string, architecture Arch, imag
 	// it's important to do further checks by digest exactly
 	repoRef := m.imageRegistry.Repo(imageName).Tag(tag)
 
+	// We were instructed to override the source image registry
+	if len(m.options.OverrideSourceImageRegistry) > 0 {
+		oldRepoRef := repoRef
+		repoRef = m.overrideImageRegistry.Repo(imageName).Tag(tag)
+		m.logger.Info("overriding image registry", zap.Stringer("old", oldRepoRef), zap.Stringer("new", repoRef))
+	}
+
 	m.logger.Debug("heading the image", zap.Stringer("image", repoRef))
 
 	descriptor, err := m.pullers[architecture].Head(ctx, repoRef)

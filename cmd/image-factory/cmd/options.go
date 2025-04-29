@@ -23,6 +23,7 @@ type Options struct { //nolint:govet
 	InsecureImageRegistry bool
 
 	// Options to verify container signatures for imager, extensions, etc.
+	ContainerSignatureSkipVerify        bool
 	ContainerSignatureSubjectRegExp     string
 	ContainerSignatureIssuerRegExp      string
 	ContainerSignatureIssuer            string
@@ -97,6 +98,7 @@ var DefaultOptions = Options{
 	SkipVersionFilter: false,
 	ImageRegistry:     "ghcr.io",
 
+	ContainerSignatureSkipVerify:        false,
 	ContainerSignatureSubjectRegExp:     `@siderolabs\.com$`,
 	ContainerSignatureIssuerRegExp:      "",
 	ContainerSignatureIssuer:            "https://accounts.google.com",

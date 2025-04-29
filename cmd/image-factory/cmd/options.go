@@ -26,6 +26,7 @@ type Options struct { //nolint:govet
 	RegistryRefreshInterval time.Duration
 
 	// Options to verify container signatures for imager, extensions, etc.
+	ContainerSignatureSkipVerify        bool
 	ContainerSignatureSubjectRegExp     string
 	ContainerSignatureIssuerRegExp      string
 	ContainerSignatureIssuer            string
@@ -102,6 +103,7 @@ var DefaultOptions = Options{
 
 	RegistryRefreshInterval: 5 * time.Minute,
 
+	ContainerSignatureSkipVerify:        false,
 	ContainerSignatureSubjectRegExp:     `@siderolabs\.com$`,
 	ContainerSignatureIssuerRegExp:      "",
 	ContainerSignatureIssuer:            "https://accounts.google.com",

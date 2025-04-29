@@ -191,77 +191,34 @@ func runMetricsServer(ctx context.Context, logger *zap.Logger, eg *errgroup.Grou
 }
 
 func buildArtifactsManager(ctx context.Context, logger *zap.Logger, opts Options) (*artifacts.Manager, error) {
-	rootCerts, err := fulcio.GetRoots()
-	if err != nil {
-		return nil, fmt.Errorf("getting Fulcio roots: %w", err)
-	}
 
-	intermediateCerts, err := fulcio.GetIntermediates()
-	if err != nil {
-		return nil, fmt.Errorf("getting Fulcio intermediates: %w", err)
-	}
-
-	rekorPubKeys, err := cosign.GetRekorPubs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting rekor public keys: %w", err)
-	}
-
-	ctLogPubKeys, err := cosign.GetCTLogPubs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error ctlog public keys: %w", err)
-	}
+	var (
+		err       error
+		checkOpts []cosign.CheckOpts
+	)
 
 	minVersion, err := semver.Parse(opts.MinTalosVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse minimum Talos version: %w", err)
 	}
 
-	var checkOpts []cosign.CheckOpts
-
-	if len(strings.TrimSpace(opts.ContainerSignaturePublicKeyFile)) > 0 {
-		var keyVerifier sigstoresignature.Verifier
-
-		keyVerifier, err = getPublicKeyVerifier(opts)
+	if !opts.ContainerSignatureSkipVerify {
+		checkOpts, err = getCosignCheckOpts(ctx, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get signature verifier for key %s: %w", opts.ContainerSignaturePublicKeyFile, err)
+			return nil, fmt.Errorf("failed to get cosign check options: %w", err)
 		}
-
-		checkOpts = append(checkOpts, cosign.CheckOpts{
-			SigVerifier: keyVerifier,
-			Offline:     true,
-			IgnoreTlog:  true,
-		})
 	}
-
-	// Prefer opts.ContainerSignatureIssuerRegExp if set as this is more flexible
-	cosignIdentities := []cosign.Identity{
-		{
-			SubjectRegExp: opts.ContainerSignatureSubjectRegExp,
-		},
-	}
-
-	if len(strings.TrimSpace(opts.ContainerSignatureIssuerRegExp)) > 0 {
-		cosignIdentities[0].IssuerRegExp = opts.ContainerSignatureIssuerRegExp
-	} else {
-		cosignIdentities[0].Issuer = opts.ContainerSignatureIssuer
-	}
-
-	checkOpts = append(checkOpts, cosign.CheckOpts{
-		RootCerts:         rootCerts,
-		IntermediateCerts: intermediateCerts,
-		RekorPubKeys:      rekorPubKeys,
-		CTLogPubKeys:      ctLogPubKeys,
-		Identities:        cosignIdentities,
-	})
 
 	artifactsManager, err := artifacts.NewManager(logger, artifacts.Options{
-		MinVersion:                  minVersion,
-		ImageRegistry:               opts.ImageRegistry,
-		InsecureImageRegistry:       opts.InsecureImageRegistry,
-		ImageVerifyOptions:          checkOpts,
-		TalosVersionRecheckInterval: opts.TalosVersionRecheckInterval,
-		RemoteOptions:               remoteOptions(),
-		RegistryRefreshInterval:     opts.RegistryRefreshInterval,
+		MinVersion:                   minVersion,
+		ContainerSignatureSkipVerify: opts.ContainerSignatureSkipVerify,
+		SkipVersionFilter:            opts.SkipVersionFilter,
+		ImageRegistry:                opts.ImageRegistry,
+		InsecureImageRegistry:        opts.InsecureImageRegistry,
+		ImageVerifyOptions:           checkOpts,
+		TalosVersionRecheckInterval:  opts.TalosVersionRecheckInterval,
+		RegistryRefreshInterval:      opts.RegistryRefreshInterval,
+		RemoteOptions:                remoteOptions(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize artifacts manager: %w", err)
@@ -388,4 +345,65 @@ func getPublicKeyVerifier(opts Options) (sigstoresignature.Verifier, error) {
 	}
 
 	return signature.LoadPublicKeyRaw(key, hashAlgo)
+}
+
+func getCosignCheckOpts(ctx context.Context, opts Options) ([]cosign.CheckOpts, error) {
+	checkOpts := []cosign.CheckOpts{}
+	rootCerts, err := fulcio.GetRoots()
+	if err != nil {
+		return nil, fmt.Errorf("getting Fulcio roots: %w", err)
+	}
+
+	intermediateCerts, err := fulcio.GetIntermediates()
+	if err != nil {
+		return nil, fmt.Errorf("getting Fulcio intermediates: %w", err)
+	}
+
+	rekorPubKeys, err := cosign.GetRekorPubs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting rekor public keys: %w", err)
+	}
+
+	ctLogPubKeys, err := cosign.GetCTLogPubs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error ctlog public keys: %w", err)
+	}
+
+	if len(strings.TrimSpace(opts.ContainerSignaturePublicKeyFile)) > 0 {
+		var keyVerifier sigstoresignature.Verifier
+
+		keyVerifier, err = getPublicKeyVerifier(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get signature verifier for key %s: %w", opts.ContainerSignaturePublicKeyFile, err)
+		}
+
+		checkOpts = append(checkOpts, cosign.CheckOpts{
+			SigVerifier: keyVerifier,
+			Offline:     true,
+			IgnoreTlog:  true,
+		})
+	}
+
+	// Prefer opts.ContainerSignatureIssuerRegExp if set as this is more flexible
+	cosignIdentities := []cosign.Identity{
+		{
+			SubjectRegExp: opts.ContainerSignatureSubjectRegExp,
+		},
+	}
+
+	if len(strings.TrimSpace(opts.ContainerSignatureIssuerRegExp)) > 0 {
+		cosignIdentities[0].IssuerRegExp = opts.ContainerSignatureIssuerRegExp
+	} else {
+		cosignIdentities[0].Issuer = opts.ContainerSignatureIssuer
+	}
+
+	checkOpts = append(checkOpts, cosign.CheckOpts{
+		RootCerts:         rootCerts,
+		IntermediateCerts: intermediateCerts,
+		RekorPubKeys:      rekorPubKeys,
+		CTLogPubKeys:      ctLogPubKeys,
+		Identities:        cosignIdentities,
+	})
+
+	return checkOpts, nil
 }

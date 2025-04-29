@@ -115,12 +115,13 @@ func (m *Manager) fetchImageByDigest(digestRef name.Digest, architecture Arch, i
 	// verify the image signature, we only accept properly signed images
 	logger.Debug("verifying image signature")
 
-	_, bundleVerified, method, err := verifyImageSignatures(ctx, digestRef, m.options.ImageVerifyOptions)
-	if err != nil {
-		return fmt.Errorf("failed to verify image signature for %s: %w", digestRef.Name(), err)
+	if !m.options.ContainerSignatureSkipVerify {
+		_, bundleVerified, method, err := verifyImageSignatures(ctx, digestRef, m.options.ImageVerifyOptions)
+		if err != nil {
+			return fmt.Errorf("failed to verify image signature for %s: %w", digestRef.Name(), err)
+		}
+		logger.Info("image signature verified", zap.String("verification_method", method), zap.Bool("bundle_verified", bundleVerified))
 	}
-
-	logger.Info("image signature verified", zap.String("verification_method", method), zap.Bool("bundle_verified", bundleVerified))
 
 	// pull down the image and extract the necessary parts
 	logger.Info("pulling the image")

@@ -24,6 +24,7 @@ func initFlags() cmd.Options {
 
 	flag.DurationVar(&opts.RegistryRefreshInterval, "registry-refresh-interval", cmd.DefaultOptions.RegistryRefreshInterval, "image registry refresh interval")
 
+	flag.BoolVar(&opts.ContainerSignatureSkipVerify, "container-signature-skip-verify", cmd.DefaultOptions.ContainerSignatureSkipVerify, "skip container image signature verification altogether")
 	flag.StringVar(&opts.ContainerSignatureSubjectRegExp, "container-signature-subject-regexp", cmd.DefaultOptions.ContainerSignatureSubjectRegExp, "container signature subject regexp")
 	flag.StringVar(&opts.ContainerSignatureIssuerRegExp, "container-signature-issuer-regexp", cmd.DefaultOptions.ContainerSignatureIssuerRegExp, "container signature issuer regexp")
 	flag.StringVar(&opts.ContainerSignatureIssuer, "container-signature-issuer", cmd.DefaultOptions.ContainerSignatureIssuer, "container signature issuer")

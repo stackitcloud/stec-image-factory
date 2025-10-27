@@ -310,6 +310,7 @@ func buildArtifactsManager(ctx context.Context, logger *zap.Logger, opts Options
 		RemoteOptions:               remoteOptions(),
 		RegistryRefreshInterval:     opts.RegistryRefreshInterval,
 
+		SkipVersionFilter:      opts.SkipVersionFilter,
 		InstallerBaseImage:     opts.Images.InstallerBaseImage,
 		InstallerImage:         opts.Images.InstallerImage,
 		ImagerImage:            opts.Images.ImagerImage,

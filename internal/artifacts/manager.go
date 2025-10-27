@@ -70,6 +70,7 @@ func NewManager(logger *zap.Logger, options Options) (*Manager, error) {
 	if options.InsecureImageRegistry {
 		opts = append(opts, name.Insecure)
 	}
+
 	overrideImageRegistry := name.Registry{}
 	if len(options.OverrideSourceImageRegistry) > 0 {
 		overrideImageRegistry, err = name.NewRegistry(options.OverrideSourceImageRegistry, opts...)

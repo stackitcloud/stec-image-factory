@@ -486,6 +486,9 @@ type AWSKMSProviderOptions struct {
 
 // ArtifactsOptions defines the names and references of images used by the image factory.
 type ArtifactsOptions struct {
+	// Replace the image registry defined in the extension/overlay image with the one defined here
+	OverrideSourceImageRegistry string `koanf:"overrideSourceImageRegistry"`
+
 	// Core contains configuration for core images used by the image factory.
 	Core CoreImagesOptions `koanf:"core"`
 
@@ -503,9 +506,6 @@ type ArtifactsOptions struct {
 
 	//  Whether to skip beta/alpha versions and such when obtaining valid Talos versions
 	SkipVersionFilter bool `koanf:"skipVersionfilter"`
-
-	// Replace the image registry defined in the extension/overlay image with the one defined here
-	OverrideSourceImageRegistry string `koanf:"overrideSourceImageRegistry"`
 }
 
 // CoreImagesOptions defines the configuration for core images used by the image factory.

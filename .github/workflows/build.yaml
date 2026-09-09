@@ -4,7 +4,7 @@
 # Required repository configuration:
 #
 #   vars.REGISTRY           registry host, e.g. registry.example.com
-#   vars.USERNAME           namespace within the registry, e.g. stec
+#   vars.NAMESPACE          namespace within the registry, e.g. stec
 #   secrets.REGISTRY_USERNAME
 #   secrets.REGISTRY_PASSWORD
 
@@ -25,7 +25,10 @@ concurrency:
 
 env:
   REGISTRY: ${{ vars.REGISTRY }}
-  USERNAME: ${{ vars.USERNAME }}
+  # USERNAME is the Makefile's name for the registry namespace, the path
+  # segment between the host and the image name. It is unrelated to
+  # REGISTRY_USERNAME below, which is the login identity.
+  USERNAME: ${{ vars.NAMESPACE }}
 
 jobs:
   check:
@@ -53,7 +56,7 @@ jobs:
       - name: check registry configuration
         run: |
           if [ -z "${REGISTRY}" ] || [ -z "${USERNAME}" ]; then
-            echo "::error::repository variables REGISTRY and USERNAME must be set"
+            echo "::error::repository variables REGISTRY and NAMESPACE must be set"
             exit 1
           fi
       - name: checkout
@@ -83,7 +86,7 @@ jobs:
       - name: check registry configuration
         run: |
           if [ -z "${REGISTRY}" ] || [ -z "${USERNAME}" ]; then
-            echo "::error::repository variables REGISTRY and USERNAME must be set"
+            echo "::error::repository variables REGISTRY and NAMESPACE must be set"
             exit 1
           fi
       - name: checkout

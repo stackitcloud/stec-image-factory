@@ -100,7 +100,7 @@ GOOS ?= $(shell uname -s | tr "[:upper:]" "[:lower:]")
 TALOS_VERSION ?= 1.12.2
 K8S_VERSION ?= v1.35.0
 CHAINSAW_VERSION ?= v0.2.12
-CHART_VERSION ?= 0.0.0-alpha.0
+CHART_VERSION ?= $(TAG)
 GO_TOOLS_RELEASE ?= v0.3.1
 TALOS_VEX_DATA_IMAGE_REF ?= $(REGISTRY_AND_USERNAME)/image-factory/test-vex-data:latest
 LOCAL_PATH_PROVISIONER_VERSION ?= v0.0.35
@@ -340,8 +340,12 @@ image-image-factory: tailwind  ## Builds image for image-factory.
 helm: $(ARTIFACTS)  ## Package helm chart
 	@helm package deploy/helm/image-factory -d $(ARTIFACTS)
 
+.PHONY: helm-push
+helm-push: helm  ## Push helm chart to the OCI registry
+	@helm push $(ARTIFACTS)/image-factory-*.tgz oci://$(HELMREPO)
+
 .PHONY: helm-release
-helm-release: helm  ## Release helm chart
+helm-release: helm  ## Release helm chart, signing it with cosign
 	@helm push $(ARTIFACTS)/image-factory-*.tgz oci://$(HELMREPO) 2>&1 | tee $(ARTIFACTS)/.digest
 	@cosign sign --yes $(COSIGN_ARGS) $(HELMREPO)/image-factory@$$(cat $(ARTIFACTS)/.digest | awk -F "[, ]+" '/Digest/{print $$NF}')
 
@@ -460,8 +464,8 @@ chart-e2e-ci: tools
 
 .PHONY: chart-version
 chart-version:
-	yq -i '.version = strenv(CHART_VERSION)' deploy/helm/image-factory/Chart.yaml
-	yq -i '.appVersion = strenv(TAG)' deploy/helm/image-factory/Chart.yaml
+	CHART_VERSION="$(CHART_VERSION)" yq -i '.version = strenv(CHART_VERSION)' deploy/helm/image-factory/Chart.yaml
+	TAG="$(TAG)" yq -i '.appVersion = strenv(TAG)' deploy/helm/image-factory/Chart.yaml
 	sed -i '/# -- Repository to use for Image Factory/{n; s|repository:.*|repository: '"$(REGISTRY)/$(USERNAME)/image-factory"'|}' deploy/helm/image-factory/values.yaml
 
 .PHONY: $(ARTIFACTS)/image-signer

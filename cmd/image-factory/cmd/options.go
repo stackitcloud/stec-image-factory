@@ -503,6 +503,9 @@ type SecureBootOptions struct {
 	// AWSKMS configures SecureBoot using AWS KMS.
 	AWSKMS AWSKMSProviderOptions `koanf:"awsKMS"`
 
+	// STACKITKMS decrypts the file-based SecureBoot keys with STACKIT KMS.
+	STACKITKMS STACKITKMSProviderOptions `koanf:"stackitKMS"`
+
 	// Enabled enables SecureBoot asset generation.
 	Enabled bool `koanf:"enabled"`
 }
@@ -547,6 +550,28 @@ type AWSKMSProviderOptions struct {
 
 	// Region is the AWS region containing the KMS keys.
 	Region string `koanf:"region"`
+}
+
+// STACKITKMSProviderOptions names the STACKIT KMS symmetric key the file-based SecureBoot keys are encrypted with.
+//
+// When set, the private keys in secureBoot.file contain the base64 ciphertext returned by the KMS
+// encrypt operation. They are decrypted at startup and kept in memory. Credentials are read from the
+// STACKIT SDK environment, for example STACKIT_SERVICE_ACCOUNT_KEY_PATH.
+type STACKITKMSProviderOptions struct {
+	// ProjectID is the STACKIT project UUID the key ring belongs to.
+	ProjectID string `koanf:"projectID"`
+
+	// Region is the STACKIT region of the key ring, for example eu01.
+	Region string `koanf:"region"`
+
+	// KeyRingID is the UUID of the key ring.
+	KeyRingID string `koanf:"keyRingID"`
+
+	// KeyID is the UUID of the aes_256_gcm key the key files are encrypted with.
+	KeyID string `koanf:"keyID"`
+
+	// KeyVersion is the version of the KMS key, defaults to 1.
+	KeyVersion int64 `koanf:"keyVersion"`
 }
 
 // ArtifactsOptions defines the names and references of images used by the image factory.

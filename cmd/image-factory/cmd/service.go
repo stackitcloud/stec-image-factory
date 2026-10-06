@@ -188,6 +188,20 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 }
 
 func buildSecureBootService(opts Options) (*secureboot.Service, error) {
+	if opts.SecureBoot.Enabled && opts.SecureBoot.STACKITKMS.KeyID != "" {
+		svc, err := secureboot.NewStackitKMSService(
+			secureboot.StackitKMSOptions(opts.SecureBoot.STACKITKMS),
+			opts.SecureBoot.File.SigningKeyPath,
+			opts.SecureBoot.File.SigningCertPath,
+			opts.SecureBoot.File.PCRKeyPath,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize SecureBoot service: %w", err)
+		}
+
+		return svc, nil
+	}
+
 	svc, err := secureboot.NewService(secureboot.Options{
 		Enabled:              opts.SecureBoot.Enabled,
 		SigningKeyPath:       opts.SecureBoot.File.SigningKeyPath,

@@ -566,6 +566,57 @@ Region is the AWS region containing the KMS keys.
 
 ---
 
+### `secureBoot.stackitKMS`
+
+STACKITKMS decrypts the file-based SecureBoot keys with STACKIT KMS.
+
+---
+
+### `secureBoot.stackitKMS.projectID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_PROJECTID`
+
+ProjectID is the STACKIT project UUID the key ring belongs to.
+
+---
+
+### `secureBoot.stackitKMS.region`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_REGION`
+
+Region is the STACKIT region of the key ring, for example eu01.
+
+---
+
+### `secureBoot.stackitKMS.keyRingID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYRINGID`
+
+KeyRingID is the UUID of the key ring.
+
+---
+
+### `secureBoot.stackitKMS.keyID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYID`
+
+KeyID is the UUID of the aes_256_gcm key the key files are encrypted with.
+
+---
+
+### `secureBoot.stackitKMS.keyVersion`
+
+- **Type:** `int64`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYVERSION`
+
+KeyVersion is the version of the KMS key, defaults to 1.
+
+---
+
 ### `secureBoot.enabled`
 
 - **Type:** `bool`
@@ -578,6 +629,15 @@ Enabled enables SecureBoot asset generation.
 ### `artifacts`
 
 Artifacts defines names and references for various images used by the factory.
+
+---
+
+### `artifacts.overrideSourceImageRegistry`
+
+- **Type:** `string`
+- **Env:** `ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY`
+
+Replace the image registry defined in the extension/overlay image with the one defined here
 
 ---
 
@@ -851,6 +911,15 @@ TalosVersionRecheckInterval sets the interval at which the image factory recheck
 - **Env:** `ARTIFACTS_REFRESHINTERVAL`
 
 RefreshInterval specifies how often the image factory should refresh its connection to registries.
+
+---
+
+### `artifacts.skipVersionfilter`
+
+- **Type:** `bool`
+- **Env:** `ARTIFACTS_SKIPVERSIONFILTER`
+
+Whether to skip beta/alpha versions and such when obtaining valid Talos versions
 
 ---
 
@@ -1508,12 +1577,14 @@ artifacts:
             namespace: siderolabs
             registry: ghcr.io
             repository: ""
+    overrideSourceImageRegistry: ""
     refreshInterval: 5m0s
     schematic:
         insecure: false
         namespace: siderolabs/image-factory
         registry: ghcr.io
         repository: schematics
+    skipVersionfilter: false
     talosVersionRecheckInterval: 15m0s
 audit:
     file:
@@ -1650,6 +1721,12 @@ secureBoot:
         pcrKeyPath: ""
         signingCertPath: ""
         signingKeyPath: ""
+    stackitKMS:
+        keyID: ""
+        keyRingID: ""
+        keyVersion: 0
+        projectID: ""
+        region: ""
 ```
 
 ### Environment Variables
@@ -1673,11 +1750,13 @@ IF_ARTIFACTS_INSTALLER_INTERNAL_INSECURE=false
 IF_ARTIFACTS_INSTALLER_INTERNAL_NAMESPACE=siderolabs
 IF_ARTIFACTS_INSTALLER_INTERNAL_REGISTRY=ghcr.io
 IF_ARTIFACTS_INSTALLER_INTERNAL_REPOSITORY=
+IF_ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY=
 IF_ARTIFACTS_REFRESHINTERVAL=5m0s
 IF_ARTIFACTS_SCHEMATIC_INSECURE=false
 IF_ARTIFACTS_SCHEMATIC_NAMESPACE=siderolabs/image-factory
 IF_ARTIFACTS_SCHEMATIC_REGISTRY=ghcr.io
 IF_ARTIFACTS_SCHEMATIC_REPOSITORY=schematics
+IF_ARTIFACTS_SKIPVERSIONFILTER=false
 IF_ARTIFACTS_TALOSVERSIONRECHECKINTERVAL=15m0s
 IF_AUDIT_FILE_MAXAGE=30
 IF_AUDIT_FILE_MAXBACKUPS=16
@@ -1778,4 +1857,9 @@ IF_SECUREBOOT_ENABLED=false
 IF_SECUREBOOT_FILE_PCRKEYPATH=
 IF_SECUREBOOT_FILE_SIGNINGCERTPATH=
 IF_SECUREBOOT_FILE_SIGNINGKEYPATH=
+IF_SECUREBOOT_STACKITKMS_KEYID=
+IF_SECUREBOOT_STACKITKMS_KEYRINGID=
+IF_SECUREBOOT_STACKITKMS_KEYVERSION=0
+IF_SECUREBOOT_STACKITKMS_PROJECTID=
+IF_SECUREBOOT_STACKITKMS_REGION=
 ```

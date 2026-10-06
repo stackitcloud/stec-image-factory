@@ -54,6 +54,8 @@ require (
 	github.com/slok/go-http-metrics v0.13.0
 	github.com/spdx/tools-golang v0.6.0-rc4
 	github.com/spf13/pflag v1.0.10
+	github.com/stackitcloud/stackit-sdk-go/core v0.27.0
+	github.com/stackitcloud/stackit-sdk-go/services/kms v1.13.1
 	github.com/stretchr/testify v1.12.1
 	github.com/u-root/u-root v0.16.0
 	github.com/ulikunitz/xz v0.5.17
@@ -66,6 +68,7 @@ require (
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.16.0
+	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
@@ -470,7 +473,6 @@ require (
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260810153831-ec0a7760b754 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/grpc v1.83.2 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect

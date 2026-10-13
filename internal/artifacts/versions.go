@@ -30,6 +30,10 @@ func (m *Manager) fetchTalosVersions() (any, error) {
 		m.logger.Debug("version filter will be skipped")
 	}
 
+	if m.options.SkipVersionFilter {
+		m.logger.Debug("version filter will be skipped")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), FetchTimeout)
 	defer cancel()
 

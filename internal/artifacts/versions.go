@@ -26,6 +26,9 @@ import (
 
 func (m *Manager) fetchTalosVersions() (any, error) {
 	m.logger.Info("fetching available Talos versions")
+	if m.options.SkipVersionFilter {
+		m.logger.Debug("version filter will be skipped")
+	}
 
 	if m.options.SkipVersionFilter {
 		m.logger.Debug("version filter will be skipped")

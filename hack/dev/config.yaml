@@ -110,3 +110,18 @@ enterprise:
       repository: test-vex-data
       insecure: true
     cacheTTL: 15s
+
+secureBoot:
+  enabled: true
+  # The two private keys are ciphertext produced by the STACKIT KMS encrypt operation and are
+  # decrypted at startup. See hack/dev/stackit-token.sh for how the files were encrypted.
+  file:
+    signingKeyPath: /etc/image-factory/secureboot/uki-signing-key.enc
+    signingCertPath: /etc/image-factory/secureboot/uki-signing-cert.pem
+    pcrKeyPath: /etc/image-factory/secureboot/pcr-signing-key.enc
+  stackitKMS:
+    projectID: 551c5326-daa2-4fd5-b614-5389dbb0190c
+    region: eu01
+    keyRingID: fdaf7511-7973-42b5-9952-31b78bc055ba
+    keyID: a25bcd52-6151-4d5a-93ab-4d099505b794
+    keyVersion: 1

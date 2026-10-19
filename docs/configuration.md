@@ -605,6 +605,15 @@ Artifacts defines names and references for various images used by the factory.
 
 ---
 
+### `artifacts.overrideSourceImageRegistry`
+
+- **Type:** `string`
+- **Env:** `ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY`
+
+Replace the image registry defined in the extension/overlay image with the one defined here
+
+---
+
 ### `artifacts.core`
 
 Core contains configuration for core images used by the image factory.
@@ -875,6 +884,15 @@ TalosVersionRecheckInterval sets the interval at which the image factory recheck
 - **Env:** `ARTIFACTS_REFRESHINTERVAL`
 
 RefreshInterval specifies how often the image factory should refresh its connection to registries.
+
+---
+
+### `artifacts.skipVersionfilter`
+
+- **Type:** `bool`
+- **Env:** `ARTIFACTS_SKIPVERSIONFILTER`
+
+Whether to skip beta/alpha versions and such when obtaining valid Talos versions
 
 ---
 
@@ -1532,12 +1550,14 @@ artifacts:
             namespace: siderolabs
             registry: ghcr.io
             repository: ""
+    overrideSourceImageRegistry: ""
     refreshInterval: 5m0s
     schematic:
         insecure: false
         namespace: siderolabs/image-factory
         registry: ghcr.io
         repository: schematics
+    skipVersionfilter: false
     talosVersionRecheckInterval: 15m0s
 audit:
     file:
@@ -1699,11 +1719,13 @@ IF_ARTIFACTS_INSTALLER_INTERNAL_INSECURE=false
 IF_ARTIFACTS_INSTALLER_INTERNAL_NAMESPACE=siderolabs
 IF_ARTIFACTS_INSTALLER_INTERNAL_REGISTRY=ghcr.io
 IF_ARTIFACTS_INSTALLER_INTERNAL_REPOSITORY=
+IF_ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY=
 IF_ARTIFACTS_REFRESHINTERVAL=5m0s
 IF_ARTIFACTS_SCHEMATIC_INSECURE=false
 IF_ARTIFACTS_SCHEMATIC_NAMESPACE=siderolabs/image-factory
 IF_ARTIFACTS_SCHEMATIC_REGISTRY=ghcr.io
 IF_ARTIFACTS_SCHEMATIC_REPOSITORY=schematics
+IF_ARTIFACTS_SKIPVERSIONFILTER=false
 IF_ARTIFACTS_TALOSVERSIONRECHECKINTERVAL=15m0s
 IF_AUDIT_FILE_MAXAGE=30
 IF_AUDIT_FILE_MAXBACKUPS=16

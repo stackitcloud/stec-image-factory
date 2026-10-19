@@ -590,6 +590,57 @@ Region is the AWS region containing the KMS keys.
 
 ---
 
+### `secureBoot.stackitKMS`
+
+STACKITKMS decrypts the file-based SecureBoot keys with STACKIT KMS.
+
+---
+
+### `secureBoot.stackitKMS.projectID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_PROJECTID`
+
+ProjectID is the STACKIT project UUID the key ring belongs to.
+
+---
+
+### `secureBoot.stackitKMS.region`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_REGION`
+
+Region is the STACKIT region of the key ring, for example eu01.
+
+---
+
+### `secureBoot.stackitKMS.keyRingID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYRINGID`
+
+KeyRingID is the UUID of the key ring.
+
+---
+
+### `secureBoot.stackitKMS.keyID`
+
+- **Type:** `string`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYID`
+
+KeyID is the UUID of the aes_256_gcm key the key files are encrypted with.
+
+---
+
+### `secureBoot.stackitKMS.keyVersion`
+
+- **Type:** `int64`
+- **Env:** `SECUREBOOT_STACKITKMS_KEYVERSION`
+
+KeyVersion is the version of the KMS key, defaults to 1.
+
+---
+
 ### `secureBoot.enabled`
 
 - **Type:** `bool`
@@ -1696,6 +1747,12 @@ secureBoot:
         pcrKeyPath: ""
         signingCertPath: ""
         signingKeyPath: ""
+    stackitKMS:
+        keyID: ""
+        keyRingID: ""
+        keyVersion: 1
+        projectID: ""
+        region: ""
 ```
 
 ### Environment Variables
@@ -1828,4 +1885,9 @@ IF_SECUREBOOT_ENABLED=false
 IF_SECUREBOOT_FILE_PCRKEYPATH=
 IF_SECUREBOOT_FILE_SIGNINGCERTPATH=
 IF_SECUREBOOT_FILE_SIGNINGKEYPATH=
+IF_SECUREBOOT_STACKITKMS_KEYID=
+IF_SECUREBOOT_STACKITKMS_KEYRINGID=
+IF_SECUREBOOT_STACKITKMS_KEYVERSION=1
+IF_SECUREBOOT_STACKITKMS_PROJECTID=
+IF_SECUREBOOT_STACKITKMS_REGION=
 ```

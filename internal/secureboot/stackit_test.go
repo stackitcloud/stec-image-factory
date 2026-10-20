@@ -121,7 +121,7 @@ func TestStackitKMSService(t *testing.T) {
 
 	kmsOpts := []config.ConfigurationOption{config.WithEndpoint(server.URL), config.WithoutAuthentication()}
 
-	svc, err := NewStackitKMSService(zaptest.NewLogger(t), opts, signingKeyPath, signingCertPath, pcrKeyPath, kmsOpts...)
+	svc, err := NewStackitKMSService(t.Context(), zaptest.NewLogger(t), opts, signingKeyPath, signingCertPath, pcrKeyPath, kmsOpts...)
 	require.NoError(t, err)
 
 	digest := sha256.Sum256([]byte("boot asset"))
@@ -151,6 +151,6 @@ func TestStackitKMSService(t *testing.T) {
 	otherCertPath := filepath.Join(dir, "other.crt")
 	require.NoError(t, os.WriteFile(otherCertPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: selfSigned(t, pcrKey).Raw}), 0o600))
 
-	_, err = NewStackitKMSService(zaptest.NewLogger(t), opts, signingKeyPath, otherCertPath, pcrKeyPath, kmsOpts...)
+	_, err = NewStackitKMSService(t.Context(), zaptest.NewLogger(t), opts, signingKeyPath, otherCertPath, pcrKeyPath, kmsOpts...)
 	require.ErrorContains(t, err, "does not match the signing key")
 }

@@ -37,12 +37,13 @@ type StackitKMSOptions struct {
 // NewStackitKMSService is the file-based approach with the private keys encrypted by STACKIT KMS:
 // the keys are decrypted at startup, sealed in memory and served to the imager over its signer sockets.
 func NewStackitKMSService(
+	ctx context.Context,
 	logger *zap.Logger,
 	opts StackitKMSOptions,
 	signingKeyPath, signingCertPath, pcrKeyPath string,
 	kmsOpts ...config.ConfigurationOption,
 ) (*Service, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
 	client, err := kms.NewAPIClient(kmsOpts...)
@@ -74,7 +75,7 @@ func NewStackitKMSService(
 		return nil, fmt.Errorf("%s does not match the signing key", signingCertPath)
 	}
 
-	secureBootAddr, err := serveSigner("secureboot", &signerServer{
+	secureBootAddr, err := serveSigner(ctx, "secureboot", &signerServer{
 		logger: logger.With(zap.String("signer", "secureboot")),
 		key:    signingKey,
 		cert:   cert,
@@ -83,7 +84,7 @@ func NewStackitKMSService(
 		return nil, err
 	}
 
-	pcrAddr, err := serveSigner("pcr", &signerServer{
+	pcrAddr, err := serveSigner(ctx, "pcr", &signerServer{
 		logger: logger.With(zap.String("signer", "pcr")),
 		key:    pcrKey,
 	})

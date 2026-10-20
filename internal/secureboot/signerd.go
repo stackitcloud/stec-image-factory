@@ -146,7 +146,7 @@ func (s *signerServer) Sign(_ context.Context, req *signer.SignRequest) (*signer
 // below the temp dir and returns the address for the imager profile.
 //
 // The path is fixed so that it does not change the profile hash between restarts.
-func serveSigner(name string, srv *signerServer) (string, error) {
+func serveSigner(ctx context.Context, name string, srv *signerServer) (string, error) {
 	path := filepath.Join(os.TempDir(), "image-factory-signer", name+".sock")
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -157,7 +157,7 @@ func serveSigner(name string, srv *signerServer) (string, error) {
 		return "", err
 	}
 
-	lis, err := net.Listen("unix", path)
+	lis, err := (&net.ListenConfig{}).Listen(ctx, "unix", path)
 	if err != nil {
 		return "", err
 	}

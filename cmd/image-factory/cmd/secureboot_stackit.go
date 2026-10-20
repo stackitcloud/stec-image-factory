@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -14,12 +15,13 @@ import (
 
 // buildSecureBootServiceWithStackit prefers the STACKIT KMS backed SecureBoot service when it is
 // configured and falls back to the upstream backends otherwise.
-func buildSecureBootServiceWithStackit(logger *zap.Logger, opts Options) (*secureboot.Service, error) {
+func buildSecureBootServiceWithStackit(ctx context.Context, logger *zap.Logger, opts Options) (*secureboot.Service, error) {
 	if !opts.SecureBoot.Enabled || opts.SecureBoot.STACKITKMS.KeyID == "" {
 		return buildSecureBootService(opts)
 	}
 
 	svc, err := secureboot.NewStackitKMSService(
+		ctx,
 		logger,
 		secureboot.StackitKMSOptions(opts.SecureBoot.STACKITKMS),
 		opts.SecureBoot.File.SigningKeyPath,

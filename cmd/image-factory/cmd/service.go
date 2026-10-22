@@ -107,7 +107,7 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 		return err
 	}
 
-	secureBootService, err := buildSecureBootService(opts)
+	secureBootService, err := buildSecureBootServiceWithStackit(ctx, logger, opts)
 	if err != nil {
 		return err
 	}

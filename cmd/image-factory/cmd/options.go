@@ -588,8 +588,8 @@ type STACKITKMSProviderOptions struct {
 
 // ArtifactsOptions defines the names and references of images used by the image factory.
 type ArtifactsOptions struct {
-	// Replace the image registry defined in the extension/overlay image with the one defined here
-	OverrideSourceImageRegistry string `koanf:"overrideSourceImageRegistry"`
+	// Source configures where extension and overlay images are pulled from.
+	Source SourceImagesOptions `koanf:"source"`
 
 	// Core contains configuration for core images used by the image factory.
 	Core CoreImagesOptions `koanf:"core"`
@@ -608,6 +608,12 @@ type ArtifactsOptions struct {
 
 	//  Whether to skip beta/alpha versions and such when obtaining valid Talos versions
 	SkipVersionFilter bool `koanf:"skipVersionfilter"`
+}
+
+// SourceImagesOptions configures where extension and overlay images are pulled from.
+type SourceImagesOptions struct {
+	// Registry replaces the registry named in the extension and overlay manifests, e.g. a mirror.
+	Registry string `koanf:"registry"`
 }
 
 // CoreImagesOptions defines the configuration for core images used by the image factory.

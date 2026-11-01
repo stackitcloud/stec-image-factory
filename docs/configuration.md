@@ -656,12 +656,18 @@ Artifacts defines names and references for various images used by the factory.
 
 ---
 
-### `artifacts.overrideSourceImageRegistry`
+### `artifacts.source`
+
+Source configures where extension and overlay images are pulled from.
+
+---
+
+### `artifacts.source.registry`
 
 - **Type:** `string`
-- **Env:** `ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY`
+- **Env:** `ARTIFACTS_SOURCE_REGISTRY`
 
-Replace the image registry defined in the extension/overlay image with the one defined here
+Registry replaces the registry named in the extension and overlay manifests, e.g. a mirror.
 
 ---
 
@@ -1601,7 +1607,6 @@ artifacts:
             namespace: siderolabs
             registry: ghcr.io
             repository: ""
-    overrideSourceImageRegistry: ""
     refreshInterval: 5m0s
     schematic:
         insecure: false
@@ -1609,6 +1614,8 @@ artifacts:
         registry: ghcr.io
         repository: schematics
     skipVersionfilter: false
+    source:
+        registry: ""
     talosVersionRecheckInterval: 15m0s
 audit:
     file:
@@ -1776,13 +1783,13 @@ IF_ARTIFACTS_INSTALLER_INTERNAL_INSECURE=false
 IF_ARTIFACTS_INSTALLER_INTERNAL_NAMESPACE=siderolabs
 IF_ARTIFACTS_INSTALLER_INTERNAL_REGISTRY=ghcr.io
 IF_ARTIFACTS_INSTALLER_INTERNAL_REPOSITORY=
-IF_ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY=
 IF_ARTIFACTS_REFRESHINTERVAL=5m0s
 IF_ARTIFACTS_SCHEMATIC_INSECURE=false
 IF_ARTIFACTS_SCHEMATIC_NAMESPACE=siderolabs/image-factory
 IF_ARTIFACTS_SCHEMATIC_REGISTRY=ghcr.io
 IF_ARTIFACTS_SCHEMATIC_REPOSITORY=schematics
 IF_ARTIFACTS_SKIPVERSIONFILTER=false
+IF_ARTIFACTS_SOURCE_REGISTRY=
 IF_ARTIFACTS_TALOSVERSIONRECHECKINTERVAL=15m0s
 IF_AUDIT_FILE_MAXAGE=30
 IF_AUDIT_FILE_MAXBACKUPS=16

@@ -8,13 +8,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/awnumar/memguard"
 	sideroX509 "github.com/siderolabs/crypto/x509"
 	"github.com/siderolabs/talos/pkg/imager/profile"
 	"github.com/stackitcloud/stackit-sdk-go/core/config"
@@ -38,7 +38,7 @@ type StackitKMSOptions struct {
 const kmsDecryptTimeout = time.Minute
 
 // NewStackitKMSService is the file-based approach with the private keys encrypted by STACKIT KMS:
-// the keys are decrypted at startup, sealed in memory and served to the imager over its signer sockets.
+// the keys are decrypted at startup, kept in memory and served to the imager over its signer sockets.
 func NewStackitKMSService(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -74,7 +74,7 @@ func NewStackitKMSService(
 		return nil, fmt.Errorf("parse %s: %w", signingCertPath, err)
 	}
 
-	if certKey, ok := cert.PublicKey.(*rsa.PublicKey); !ok || !certKey.Equal(signingKey.public) {
+	if certKey, ok := cert.PublicKey.(*rsa.PublicKey); !ok || !certKey.Equal(&signingKey.PublicKey) {
 		return nil, fmt.Errorf("%s does not match the signing key", signingCertPath)
 	}
 
@@ -95,7 +95,7 @@ func NewStackitKMSService(
 		return nil, err
 	}
 
-	logger.Info("SecureBoot keys decrypted with STACKIT KMS and sealed in memory",
+	logger.Info("SecureBoot keys decrypted with STACKIT KMS and kept in memory",
 		zap.String("project_id", opts.ProjectID),
 		zap.String("region", opts.Region),
 		zap.String("key_ring_id", opts.KeyRingID),
@@ -114,8 +114,8 @@ func NewStackitKMSService(
 	}, nil
 }
 
-// decryptKey decrypts the KMS ciphertext at path and seals the RSA private key it contains.
-func decryptKey(ctx context.Context, client *kms.APIClient, opts StackitKMSOptions, path string) (*sealedKey, error) {
+// decryptKey decrypts the KMS ciphertext at path and parses the RSA private key it contains.
+func decryptKey(ctx context.Context, client *kms.APIClient, opts StackitKMSOptions, path string) (*rsa.PrivateKey, error) {
 	ciphertext, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -132,14 +132,12 @@ func decryptKey(ctx context.Context, client *kms.APIClient, opts StackitKMSOptio
 		return nil, fmt.Errorf("decode decrypted %s: %w", path, err)
 	}
 
-	defer memguard.WipeBytes(keyPEM)
-
 	block, _ := pem.Decode(keyPEM)
 	if block == nil || block.Type != "RSA PRIVATE KEY" {
 		return nil, fmt.Errorf("decrypted %s: expected a PEM encoded RSA PRIVATE KEY", path)
 	}
 
-	key, err := sealKey(block.Bytes)
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("decrypted %s: %w", path, err)
 	}

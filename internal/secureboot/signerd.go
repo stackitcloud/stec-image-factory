@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/awnumar/memguard"
 	"github.com/siderolabs/talos/pkg/machinery/api/signer"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -26,46 +25,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// sealedKey keeps the PKCS#1 encoding of an RSA private key in a memguard enclave and
-// decrypts it per signing operation. The parsed key is still an ordinary heap allocation.
-type sealedKey struct {
-	enclave *memguard.Enclave
-	public  *rsa.PublicKey
-}
-
-// sealKey seals der and wipes it.
-func sealKey(der []byte) (*sealedKey, error) {
-	key, err := x509.ParsePKCS1PrivateKey(der)
-	if err != nil {
-		memguard.WipeBytes(der)
-
-		return nil, err
-	}
-
-	return &sealedKey{
-		enclave: memguard.NewEnclave(der),
-		public:  &key.PublicKey,
-	}, nil
-}
-
-// open decrypts and parses the key.
-func (k *sealedKey) open() (*rsa.PrivateKey, error) {
-	buf, err := k.enclave.Open()
-	if err != nil {
-		return nil, err
-	}
-
-	defer buf.Destroy()
-
-	return x509.ParsePKCS1PrivateKey(buf.Bytes())
-}
-
-// signerServer serves a sealed RSA key over the Talos SignerService API.
+// signerServer serves an RSA key over the Talos SignerService API.
 type signerServer struct {
 	signer.UnimplementedSignerServiceServer
 
 	logger *zap.Logger
-	key    *sealedKey
+	key    *rsa.PrivateKey
 	cert   *x509.Certificate
 }
 
@@ -80,7 +45,7 @@ func (s *signerServer) GetCertificate(context.Context, *emptypb.Empty) (*signer.
 }
 
 func (s *signerServer) GetPublicKey(context.Context, *emptypb.Empty) (*signer.PublicKeyResponse, error) {
-	der, err := x509.MarshalPKIXPublicKey(s.key.public)
+	der, err := x509.MarshalPKIXPublicKey(&s.key.PublicKey)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "marshal public key: %v", err)
 	}
@@ -106,20 +71,16 @@ func (s *signerServer) Sign(_ context.Context, req *signer.SignRequest) (*signer
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported hash %s", req.GetHash())
 	}
 
-	key, err := s.key.open()
-	if err != nil {
-		s.logger.Warn("opening the sealed key failed", zap.Error(err))
-
-		return nil, status.Errorf(codes.Internal, "open key: %v", err)
-	}
-
-	var signature []byte
+	var (
+		signature []byte
+		err       error
+	)
 
 	switch req.GetScheme() {
 	case signer.Scheme_SCHEME_RSA_PKCS1V15:
-		signature, err = rsa.SignPKCS1v15(rand.Reader, key, hash, req.GetDigest())
+		signature, err = rsa.SignPKCS1v15(rand.Reader, s.key, hash, req.GetDigest())
 	case signer.Scheme_SCHEME_RSA_PSS:
-		signature, err = rsa.SignPSS(rand.Reader, key, hash, req.GetDigest(), &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
+		signature, err = rsa.SignPSS(rand.Reader, s.key, hash, req.GetDigest(), &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
 	case signer.Scheme_SCHEME_UNSPECIFIED:
 		fallthrough
 	default:

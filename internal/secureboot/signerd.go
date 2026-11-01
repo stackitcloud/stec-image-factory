@@ -135,12 +135,15 @@ func (s *signerServer) Sign(_ context.Context, req *signer.SignRequest) (*signer
 	return &signer.SignResponse{Signature: signature}, nil
 }
 
+// signerSocketDir is the directory below the temp dir holding the signer sockets.
+const signerSocketDir = "image-factory-signer"
+
 // serveSigner serves srv for the lifetime of the process on a unix socket
 // below the temp dir and returns the address for the imager profile.
 //
 // The path is fixed so that it does not change the profile hash between restarts.
 func serveSigner(ctx context.Context, name string, srv *signerServer) (string, error) {
-	path := filepath.Join(os.TempDir(), "image-factory-signer", name+".sock")
+	path := filepath.Join(os.TempDir(), signerSocketDir, name+".sock")
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", err

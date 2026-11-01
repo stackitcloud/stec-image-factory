@@ -192,6 +192,13 @@ config:
       # certificateName: ""
       # keyName: ""
       # url: ""
+    ## STACKIT KMS key the file-based private keys are encrypted with (decrypted at startup)
+    # stackitKMS:
+      # projectID: ""
+      # region: ""
+      # keyRingID: ""
+      # keyID: ""
+      # keyVersion: 1
     ## Enable SecureBoot asset generation
     # enabled: false
     ## Local file-based keys for signing

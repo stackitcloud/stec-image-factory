@@ -250,6 +250,28 @@ config:
       certificateName: signing-cert
 ```
 
+### Using STACKIT KMS
+
+The local files approach with the private keys encrypted by a STACKIT KMS
+`aes_256_gcm` key. The key files contain the base64 ciphertext returned by the
+KMS encrypt operation and are decrypted at startup. Credentials come from the
+STACKIT SDK environment, for example `STACKIT_SERVICE_ACCOUNT_KEY_PATH`.
+
+```yaml
+config:
+  secureBoot:
+    enabled: true
+    file:
+      signingCertPath: /path/to/cert.pem
+      signingKeyPath: /path/to/key.pem.enc
+      pcrKeyPath: /path/to/pcr-key.pem.enc
+    stackitKMS:
+      projectID: 00000000-0000-0000-0000-000000000000
+      region: eu01
+      keyRingID: 00000000-0000-0000-0000-000000000000
+      keyID: 00000000-0000-0000-0000-000000000000
+```
+
 ## Monitoring
 
 ### Prometheus ServiceMonitor

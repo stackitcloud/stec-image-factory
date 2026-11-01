@@ -515,6 +515,9 @@ type SecureBootOptions struct {
 	// AWSKMS configures SecureBoot using AWS KMS.
 	AWSKMS AWSKMSProviderOptions `koanf:"awsKMS"`
 
+	// STACKITKMS decrypts the file-based SecureBoot keys with STACKIT KMS.
+	STACKITKMS STACKITKMSProviderOptions `koanf:"stackitKMS"`
+
 	// Enabled enables SecureBoot asset generation.
 	Enabled bool `koanf:"enabled"`
 }
@@ -561,10 +564,32 @@ type AWSKMSProviderOptions struct {
 	Region string `koanf:"region"`
 }
 
+// STACKITKMSProviderOptions names the STACKIT KMS symmetric key the file-based SecureBoot keys are encrypted with.
+//
+// When set, the private keys in secureBoot.file contain the base64 ciphertext returned by the KMS
+// encrypt operation. They are decrypted at startup and kept in memory. Credentials are read from the
+// STACKIT SDK environment, for example STACKIT_SERVICE_ACCOUNT_KEY_PATH.
+type STACKITKMSProviderOptions struct {
+	// ProjectID is the STACKIT project UUID the key ring belongs to.
+	ProjectID string `koanf:"projectID"`
+
+	// Region is the STACKIT region of the key ring, for example eu01.
+	Region string `koanf:"region"`
+
+	// KeyRingID is the UUID of the key ring.
+	KeyRingID string `koanf:"keyRingID"`
+
+	// KeyID is the UUID of the aes_256_gcm key the key files are encrypted with.
+	KeyID string `koanf:"keyID"`
+
+	// KeyVersion is the version of the KMS key, defaults to 1.
+	KeyVersion int64 `koanf:"keyVersion"`
+}
+
 // ArtifactsOptions defines the names and references of images used by the image factory.
 type ArtifactsOptions struct {
-	// Replace the image registry defined in the extension/overlay image with the one defined here
-	OverrideSourceImageRegistry string `koanf:"overrideSourceImageRegistry"`
+	// Source configures where extension and overlay images are pulled from.
+	Source SourceImagesOptions `koanf:"source"`
 
 	// Core contains configuration for core images used by the image factory.
 	Core CoreImagesOptions `koanf:"core"`
@@ -581,8 +606,20 @@ type ArtifactsOptions struct {
 	// RefreshInterval specifies how often the image factory should refresh its connection to registries.
 	RefreshInterval time.Duration `koanf:"refreshInterval"`
 
-	//  Whether to skip beta/alpha versions and such when obtaining valid Talos versions
-	SkipVersionFilter bool `koanf:"skipVersionfilter"`
+	// Prereleases controls whether alpha, beta and rc Talos versions are offered.
+	Prereleases PrereleasesOptions `koanf:"prereleases"`
+}
+
+// PrereleasesOptions controls whether alpha, beta and rc Talos versions are offered.
+type PrereleasesOptions struct {
+	// Enabled offers prerelease Talos versions instead of filtering them out.
+	Enabled bool `koanf:"enabled"`
+}
+
+// SourceImagesOptions configures where extension and overlay images are pulled from.
+type SourceImagesOptions struct {
+	// Registry replaces the registry named in the extension and overlay manifests, e.g. a mirror.
+	Registry string `koanf:"registry"`
 }
 
 // CoreImagesOptions defines the configuration for core images used by the image factory.
@@ -1032,6 +1069,12 @@ var DefaultOptions = Options{
 			MaxAge:     30,
 			MaxSizeMB:  256,
 			MaxBackups: 16,
+		},
+	},
+
+	SecureBoot: SecureBootOptions{
+		STACKITKMS: STACKITKMSProviderOptions{
+			KeyVersion: 1,
 		},
 	},
 

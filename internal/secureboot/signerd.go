@@ -161,7 +161,11 @@ func serveSigner(ctx context.Context, name string, srv *signerServer) (string, e
 	server := grpc.NewServer()
 	signer.RegisterSignerServiceServer(server, srv)
 
-	go server.Serve(lis) //nolint:errcheck
+	go func() {
+		if err := server.Serve(lis); err != nil {
+			srv.logger.Error("signer server stopped", zap.Error(err))
+		}
+	}()
 
 	return "unix://" + path, nil
 }

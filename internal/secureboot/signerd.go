@@ -48,21 +48,16 @@ func sealKey(der []byte) (*sealedKey, error) {
 	}, nil
 }
 
-// open decrypts the key; the caller destroys the returned buffer when done.
-func (k *sealedKey) open() (*rsa.PrivateKey, *memguard.LockedBuffer, error) {
+// open decrypts and parses the key.
+func (k *sealedKey) open() (*rsa.PrivateKey, error) {
 	buf, err := k.enclave.Open()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	key, err := x509.ParsePKCS1PrivateKey(buf.Bytes())
-	if err != nil {
-		buf.Destroy()
+	defer buf.Destroy()
 
-		return nil, nil, err
-	}
-
-	return key, buf, nil
+	return x509.ParsePKCS1PrivateKey(buf.Bytes())
 }
 
 // signerServer serves a sealed RSA key over the Talos SignerService API.
@@ -111,14 +106,12 @@ func (s *signerServer) Sign(_ context.Context, req *signer.SignRequest) (*signer
 		return nil, status.Errorf(codes.InvalidArgument, "unsupported hash %s", req.GetHash())
 	}
 
-	key, buf, err := s.key.open()
+	key, err := s.key.open()
 	if err != nil {
 		s.logger.Warn("opening the sealed key failed", zap.Error(err))
 
 		return nil, status.Errorf(codes.Internal, "open key: %v", err)
 	}
-
-	defer buf.Destroy()
 
 	var signature []byte
 

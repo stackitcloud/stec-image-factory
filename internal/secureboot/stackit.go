@@ -34,6 +34,9 @@ type StackitKMSOptions struct {
 	KeyVersion int64
 }
 
+// kmsDecryptTimeout bounds the KMS decrypt calls at startup.
+const kmsDecryptTimeout = time.Minute
+
 // NewStackitKMSService is the file-based approach with the private keys encrypted by STACKIT KMS:
 // the keys are decrypted at startup, sealed in memory and served to the imager over its signer sockets.
 func NewStackitKMSService(
@@ -43,7 +46,7 @@ func NewStackitKMSService(
 	signingKeyPath, signingCertPath, pcrKeyPath string,
 	kmsOpts ...config.ConfigurationOption,
 ) (*Service, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, kmsDecryptTimeout)
 	defer cancel()
 
 	client, err := kms.NewAPIClient(kmsOpts...)

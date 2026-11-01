@@ -606,8 +606,14 @@ type ArtifactsOptions struct {
 	// RefreshInterval specifies how often the image factory should refresh its connection to registries.
 	RefreshInterval time.Duration `koanf:"refreshInterval"`
 
-	//  Whether to skip beta/alpha versions and such when obtaining valid Talos versions
-	SkipVersionFilter bool `koanf:"skipVersionfilter"`
+	// Prereleases controls whether alpha, beta and rc Talos versions are offered.
+	Prereleases PrereleasesOptions `koanf:"prereleases"`
+}
+
+// PrereleasesOptions controls whether alpha, beta and rc Talos versions are offered.
+type PrereleasesOptions struct {
+	// Enabled offers prerelease Talos versions instead of filtering them out.
+	Enabled bool `koanf:"enabled"`
 }
 
 // SourceImagesOptions configures where extension and overlay images are pulled from.

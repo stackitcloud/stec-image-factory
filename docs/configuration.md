@@ -944,12 +944,18 @@ RefreshInterval specifies how often the image factory should refresh its connect
 
 ---
 
-### `artifacts.skipVersionfilter`
+### `artifacts.prereleases`
+
+Prereleases controls whether alpha, beta and rc Talos versions are offered.
+
+---
+
+### `artifacts.prereleases.enabled`
 
 - **Type:** `bool`
-- **Env:** `ARTIFACTS_SKIPVERSIONFILTER`
+- **Env:** `ARTIFACTS_PRERELEASES_ENABLED`
 
-Whether to skip beta/alpha versions and such when obtaining valid Talos versions
+Enabled offers prerelease Talos versions instead of filtering them out.
 
 ---
 
@@ -1607,13 +1613,14 @@ artifacts:
             namespace: siderolabs
             registry: ghcr.io
             repository: ""
+    prereleases:
+        enabled: false
     refreshInterval: 5m0s
     schematic:
         insecure: false
         namespace: siderolabs/image-factory
         registry: ghcr.io
         repository: schematics
-    skipVersionfilter: false
     source:
         registry: ""
     talosVersionRecheckInterval: 15m0s
@@ -1783,12 +1790,12 @@ IF_ARTIFACTS_INSTALLER_INTERNAL_INSECURE=false
 IF_ARTIFACTS_INSTALLER_INTERNAL_NAMESPACE=siderolabs
 IF_ARTIFACTS_INSTALLER_INTERNAL_REGISTRY=ghcr.io
 IF_ARTIFACTS_INSTALLER_INTERNAL_REPOSITORY=
+IF_ARTIFACTS_PRERELEASES_ENABLED=false
 IF_ARTIFACTS_REFRESHINTERVAL=5m0s
 IF_ARTIFACTS_SCHEMATIC_INSECURE=false
 IF_ARTIFACTS_SCHEMATIC_NAMESPACE=siderolabs/image-factory
 IF_ARTIFACTS_SCHEMATIC_REGISTRY=ghcr.io
 IF_ARTIFACTS_SCHEMATIC_REPOSITORY=schematics
-IF_ARTIFACTS_SKIPVERSIONFILTER=false
 IF_ARTIFACTS_SOURCE_REGISTRY=
 IF_ARTIFACTS_TALOSVERSIONRECHECKINTERVAL=15m0s
 IF_AUDIT_FILE_MAXAGE=30

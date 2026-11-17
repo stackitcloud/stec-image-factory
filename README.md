@@ -33,6 +33,7 @@ Running instances expose the rendered reference at `/llms.txt` and the canonical
 * [Required Source Container Images](docs/sources.md)
 * [Air-gapped Deployment](docs/air-gapped.md)
 * [Cache](docs/cache.md)
+* [Horizontal Scaling](docs/scaling.md)
 * [Developing Image Factory](docs/developing.md)
 * [Helm Chart](docs/chart.md)
 

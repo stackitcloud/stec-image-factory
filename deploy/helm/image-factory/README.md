@@ -327,6 +327,17 @@ extraVolumeMounts:
 | cacheSigningKey.existingSecret | string | `""` | Name of an existing Secret containing the ECDSA private key. IMPORTANT: The existing secret MUST contain a data key named exactly "cache-signing.key". If your secret uses a different key, Image Factory will not find the file. Example creation: kubectl create secret generic image-factory-cache-signing-key --from-file=cache-signing.key=./signing-key.key |
 | cacheSigningKey.key | string | `""` | If 'existingSecret' is empty, a new Secret will be created. The ECDSA private key content (multiline string). Generate using: openssl ecparam -name prime256v1 -genkey -noout -out cache-signing.key |
 | config | object | `{"artifacts":{"schematic":{"insecure":false,"namespace":"siderolabs/image-factory","registry":"registry.example.com","repository":"schematics"}},"authentication":{"enabled":false,"htpasswdPath":"/etc/image-factory/auth/htpasswd","provider":"htpasswd"},"cache":{"signingKeyPath":"/etc/image-factory/keys/cache-signing.key"},"registry":{"debug":false,"jobs":64}}` | Sidero Image-Factory Configuration |
+| demo | object | `{"podAnnotations":{},"rabbitmq":{"enabled":false,"image":{"repository":"rabbitmq","tag":"4-management"},"nodeSelector":{},"password":"image-factory","resources":{},"username":"image-factory"},"registry":{"enabled":false,"image":{"repository":"ghcr.io/distribution/distribution","tag":"3.1.0"},"nodeSelector":{},"persistence":{"enabled":false,"size":"50Gi","storageClassName":""},"resources":{},"service":{"nodePort":null,"type":"ClusterIP"}},"registryMirror":{"enabled":false,"image":{"repository":"ghcr.io/distribution/distribution","tag":"edge"},"nodeSelector":{},"persistence":{"enabled":false,"size":"20Gi","storageClassName":""},"remoteURL":"https://ghcr.io","resources":{},"service":{"nodePort":null,"type":"ClusterIP"}}}` | Bundled dependencies for demos, tests and benchmarks. Single replicas without TLS and with static credentials: do not use them in production. The registries are services named after the release, e.g. `image-factory-registry:5000` and `image-factory-registry-mirror:5000` for a release called `image-factory`. Point `config.artifacts` and `config.cache` to them (with `insecure: true`). |
+| demo.podAnnotations | object | `{}` | Annotations for the pods of the bundled dependencies |
+| demo.rabbitmq.enabled | bool | `false` | Deploy a RabbitMQ server |
+| demo.rabbitmq.password | string | `"image-factory"` | RabbitMQ password |
+| demo.rabbitmq.username | string | `"image-factory"` | RabbitMQ user |
+| demo.registry.enabled | bool | `false` | Deploy an OCI registry |
+| demo.registry.persistence.enabled | bool | `false` | Keep the registry content in a PersistentVolumeClaim instead of an emptyDir |
+| demo.registry.service.nodePort | string | `nil` | Node port, if the service type is NodePort |
+| demo.registry.service.type | string | `"ClusterIP"` | Service type; NodePort makes the registry available to the container runtime of the nodes |
+| demo.registryMirror.enabled | bool | `false` | Deploy a pull-through registry mirror |
+| demo.registryMirror.remoteURL | string | `"https://ghcr.io"` | Registry to mirror |
 | env | list | `[]` | Environment variables to pass to Image Factory |
 | envFrom | list | `[]` | envFrom to pass to Image Factory |
 | extraObjects | list | `[]` |  |
@@ -375,6 +386,10 @@ extraVolumeMounts:
 | podAnnotations | object | `{}` |  |
 | podLabels | object | `{}` |  |
 | podSecurityContext | object | `{}` |  |
+| queue | object | `{"enabled":false,"existingSecret":"","url":""}` | Horizontal scaling: build assets on a pool of workers. With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend and publish a build request to RabbitMQ for every asset missing in the cache. The replicas of the worker Deployment build the assets and push them to the cache. Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas. |
+| queue.enabled | bool | `false` | Split the Image Factory into frontend and worker replicas. |
+| queue.existingSecret | string | `""` | Name of an existing Secret containing the AMQP URL in the data key "url". Takes precedence over `queue.url`. |
+| queue.url | string | `""` | AMQP URL of the RabbitMQ server, e.g. amqp://user:password@rabbitmq:5672/. It is stored in a Secret. Defaults to the bundled RabbitMQ if `demo.rabbitmq.enabled` is set. |
 | readinessProbe | object | `{}` |  |
 | replicaCount | int | `1` |  |
 | resources | object | `{}` | Resources Configuration Set CPU and Memory resource requests and limits for the Image Factory pod. |
@@ -416,3 +431,18 @@ extraVolumeMounts:
 | serviceAccount.name | string | `""` |  |
 | strategy | object | `{"type":"Recreate"}` | Deployment strategy. Image Factory currently only supports Recreate strategy. |
 | tolerations | list | `[]` |  |
+| worker | object | `{"affinity":{},"livenessProbe":{},"maxConcurrency":null,"nodeSelector":{},"podAnnotations":{},"podLabels":{},"readinessProbe":{},"replicaCount":2,"resources":{},"scratchVolume":{"emptyDir":{}},"strategy":{"type":"RollingUpdate"},"terminationGracePeriodSeconds":30,"tolerations":[],"topologySpreadConstraints":[]}` | Worker Deployment, only used when `queue.enabled` is set. Image, arguments, environment, config, security context and extra volumes are shared with the frontend. |
+| worker.affinity | object | `{}` | Affinity for the worker pods |
+| worker.livenessProbe | object | `{}` | Liveness probe of the workers; a worker serves `/healthz` on the http port. |
+| worker.maxConcurrency | string | `nil` | Number of assets a worker builds at the same time. Defaults to `config.build.maxConcurrency`. |
+| worker.nodeSelector | object | `{}` | Node selector for the worker pods |
+| worker.podAnnotations | object | `{}` | Annotations for the worker pods |
+| worker.podLabels | object | `{}` | Labels for the worker pods |
+| worker.readinessProbe | object | `{}` | Readiness probe of the workers; a worker serves `/readyz` on the http port, reporting the connection to the queue. |
+| worker.replicaCount | int | `2` | Number of worker replicas |
+| worker.resources | object | `{}` | Resources of the workers. A build needs about one CPU, memory depends on the image format. |
+| worker.scratchVolume | object | `{"emptyDir":{}}` | Volume source of the scratch space (mounted at /tmp), where the workers keep the Talos artifacts and assemble the images. A disk image takes several GB of writes: on nodes with a slow root disk use a faster volume, e.g. a generic ephemeral volume (`ephemeral.volumeClaimTemplate`, together with `podSecurityContext.fsGroup`). |
+| worker.strategy | object | `{"type":"RollingUpdate"}` | Deployment strategy of the workers |
+| worker.terminationGracePeriodSeconds | int | `30` | Seconds a worker gets to shut down. An unfinished build is redelivered to another worker. |
+| worker.tolerations | list | `[]` | Tolerations for the worker pods |
+| worker.topologySpreadConstraints | list | `[]` | Topology spread constraints for the worker pods |

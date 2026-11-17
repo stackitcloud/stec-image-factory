@@ -1,0 +1,276 @@
+suite: Horizontal scaling
+templates:
+  - deployment.yaml
+  - deployment-worker.yaml
+  - secret-queue.yaml
+  - worker-metrics.yaml
+  - demo.yaml
+  - configmap.yaml
+set:
+  cacheSigningKey:
+    key: dummy
+
+tests:
+  - it: Should not render any queue resources by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: deployment-worker.yaml
+      - hasDocuments:
+          count: 0
+        template: secret-queue.yaml
+      - hasDocuments:
+          count: 0
+        template: worker-metrics.yaml
+      - hasDocuments:
+          count: 0
+        template: demo.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env
+        template: deployment.yaml
+
+  - it: Should run the main deployment as frontend
+    template: deployment.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+      env:
+        - name: FOO
+          value: bar
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: IF_QUEUE_MODE
+              value: frontend
+            - name: IF_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: RELEASE-NAME-image-factory-queue
+                  key: url
+            - name: FOO
+              value: bar
+
+  - it: Should render the workers
+    template: deployment-worker.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+      worker:
+        replicaCount: 10
+        maxConcurrency: 2
+        resources:
+          requests:
+            cpu: "1"
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-image-factory-worker
+      - equal:
+          path: spec.replicas
+          value: 10
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: IF_QUEUE_MODE
+            value: worker
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: IF_BUILD_MAXCONCURRENCY
+            value: "2"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: cache-signing-key
+            mountPath: /etc/image-factory/keys
+            readOnly: true
+
+  - it: Should use an emptyDir as worker scratch space by default
+    template: deployment-worker.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: scratch
+            emptyDir: {}
+
+  - it: Should allow another worker scratch volume
+    template: deployment-worker.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+      worker:
+        scratchVolume:
+          emptyDir: null
+          ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                storageClassName: fast
+                resources:
+                  requests:
+                    storage: 50Gi
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: scratch
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: [ReadWriteOnce]
+                  storageClassName: fast
+                  resources:
+                    requests:
+                      storage: 50Gi
+
+  - it: Should keep the workers out of the frontend selectors
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: image-factory-worker
+            app.kubernetes.io/instance: RELEASE-NAME
+        template: deployment-worker.yaml
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: image-factory
+            app.kubernetes.io/instance: RELEASE-NAME
+        template: deployment.yaml
+
+  - it: Should store the queue URL in a secret
+    template: secret-queue.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+    asserts:
+      - equal:
+          path: stringData.url
+          value: amqp://user:secret@rabbitmq:5672/
+
+  - it: Should use an existing queue secret
+    set:
+      queue:
+        enabled: true
+        existingSecret: my-queue
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: secret-queue.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: IF_QUEUE_URL
+            valueFrom:
+              secretKeyRef:
+                name: my-queue
+                key: url
+        template: deployment-worker.yaml
+
+  - it: Should require a queue URL
+    template: secret-queue.yaml
+    set:
+      queue:
+        enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "queue.url, queue.existingSecret or demo.rabbitmq.enabled is required"
+
+  - it: Should default the queue URL to the bundled RabbitMQ
+    template: secret-queue.yaml
+    set:
+      queue:
+        enabled: true
+      demo:
+        rabbitmq:
+          enabled: true
+    asserts:
+      - equal:
+          path: stringData.url
+          value: amqp://image-factory:image-factory@RELEASE-NAME-image-factory-rabbitmq:5672/
+
+  - it: Should expose the worker metrics
+    template: worker-metrics.yaml
+    set:
+      queue:
+        enabled: true
+        url: amqp://user:secret@rabbitmq:5672/
+      service:
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: image-factory-worker
+            app.kubernetes.io/instance: RELEASE-NAME
+        documentIndex: 0
+      - isKind:
+          of: ServiceMonitor
+        documentIndex: 1
+
+  - it: Should render the bundled dependencies
+    template: demo.yaml
+    set:
+      demo:
+        rabbitmq:
+          enabled: true
+        registry:
+          enabled: true
+          service:
+            type: NodePort
+            nodePort: 30500
+          persistence:
+            enabled: true
+            size: 100Gi
+        registryMirror:
+          enabled: true
+    asserts:
+      # registry: Deployment, Service, PVC; mirror: Deployment, Service; RabbitMQ: Secret, Deployment, Service
+      - hasDocuments:
+          count: 8
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-image-factory-registry
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30500
+        documentIndex: 1
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Gi
+        documentIndex: 2
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_PROXY_REMOTEURL
+            value: https://ghcr.io
+        documentIndex: 3
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-image-factory-rabbitmq
+        documentIndex: 6

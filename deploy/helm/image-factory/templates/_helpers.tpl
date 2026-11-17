@@ -101,3 +101,46 @@ Return the name of the Grype DB PersistentVolumeClaim to use.
 {{- define "image-factory.grypeDBClaim" -}}
     {{- include "image-factory.fullname" . -}}-grype-db
 {{- end -}}
+
+{{/*
+Worker labels. Workers carry a name of their own, so that the selectors of the
+frontend Deployment and Services do not match them.
+*/}}
+{{- define "image-factory.worker.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "image-factory.name" . }}-worker
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "image-factory.worker.labels" -}}
+helm.sh/chart: {{ include "image-factory.chart" . }}
+{{ include "image-factory.worker.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/component: worker
+{{- end }}
+
+{{/*
+Return the name of the Secret with the build queue URL.
+*/}}
+{{- define "image-factory.queueSecret" -}}
+{{- if .Values.queue.existingSecret -}}
+    {{- .Values.queue.existingSecret -}}
+{{- else -}}
+    {{- include "image-factory.fullname" . -}}-queue
+{{- end -}}
+{{- end -}}
+
+{{/*
+Environment variables selecting the role of a replica. Takes a dict with "root" and "mode".
+*/}}
+{{- define "image-factory.queueEnv" -}}
+- name: IF_QUEUE_MODE
+  value: {{ .mode }}
+- name: IF_QUEUE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "image-factory.queueSecret" .root }}
+      key: url
+{{- end -}}

@@ -451,6 +451,59 @@ NegativeTTL sets the time-to-live for negative cache entries (schematics not fou
 
 ---
 
+### `queue`
+
+Queue distributes asset builds across several replicas (horizontal scaling).
+
+---
+
+### `queue.mode`
+
+- **Type:** `string`
+- **Env:** `QUEUE_MODE`
+
+Mode selects the role of this replica: "standalone" (default, no queue), "frontend" or "worker".
+
+---
+
+### `queue.url`
+
+- **Type:** `string`
+- **Env:** `QUEUE_URL`
+
+URL is the AMQP URL of the RabbitMQ server, e.g. amqp://user:password@rabbitmq:5672/.
+Required for the frontend and worker modes.
+
+---
+
+### `queue.requestQueue`
+
+- **Type:** `string`
+- **Env:** `QUEUE_REQUESTQUEUE`
+
+RequestQueue is the name of the RabbitMQ queue for the build requests.
+
+---
+
+### `queue.resultExchange`
+
+- **Type:** `string`
+- **Env:** `QUEUE_RESULTEXCHANGE`
+
+ResultExchange is the name of the RabbitMQ exchange for the build results.
+
+---
+
+### `queue.buildTimeout`
+
+- **Type:** `time.Duration`
+- **Env:** `QUEUE_BUILDTIMEOUT`
+
+BuildTimeout limits the time a frontend waits for the workers to build an asset,
+including the time the request spends in the queue.
+
+---
+
 ### `metrics`
 
 Metrics holds configuration for the Prometheus metrics endpoint.
@@ -1657,6 +1710,12 @@ http:
     keyFile: ""
 metrics:
     addr: :2122
+queue:
+    buildTimeout: 30m0s
+    mode: standalone
+    requestQueue: image-factory.build-requests
+    resultExchange: image-factory.build-results
+    url: ""
 registry:
     debug: false
     jobs: 64
@@ -1792,6 +1851,11 @@ IF_HTTP_EXTERNALURL=https://localhost/
 IF_HTTP_HTTPLISTENADDR=:8080
 IF_HTTP_KEYFILE=
 IF_METRICS_ADDR=:2122
+IF_QUEUE_BUILDTIMEOUT=30m0s
+IF_QUEUE_MODE=standalone
+IF_QUEUE_REQUESTQUEUE=image-factory.build-requests
+IF_QUEUE_RESULTEXCHANGE=image-factory.build-results
+IF_QUEUE_URL=
 IF_REGISTRY_DEBUG=false
 IF_REGISTRY_JOBS=64
 IF_SECUREBOOT_AWSKMS_CERTARN=

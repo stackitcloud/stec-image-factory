@@ -36,6 +36,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/ory/dockertest/v4 v4.0.0
 	github.com/prometheus/client_golang v1.25.0
+	github.com/rabbitmq/amqp091-go v1.16.0
 	github.com/rs/cors v1.11.1
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/siderolabs/crypto v0.6.5

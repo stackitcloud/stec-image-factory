@@ -542,3 +542,128 @@ extraObjects: []
   #     name: image-factory-example
   #   data:
   #     custom-setting: "true"
+
+# -- Horizontal scaling: build assets on a pool of workers.
+# With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend
+# and publish a build request to the queue (RabbitMQ or Valkey) for every asset missing in the cache. The
+# replicas of the worker Deployment build the assets and push them to the cache.
+# Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas.
+queue:
+  # -- Split the Image Factory into frontend and worker replicas.
+  enabled: false
+  # -- URL of the queue server: RabbitMQ (amqp://user:password@rabbitmq:5672/) or Valkey (valkey://user:password@valkey:6379/0).
+  # It is stored in a Secret. Defaults to the bundled server if `demo.rabbitmq.enabled` or `demo.valkey.enabled` is set.
+  url: ""
+  # -- Name of an existing Secret containing the queue URL in the data key "url". Takes precedence over `queue.url`.
+  existingSecret: ""
+
+# -- Worker Deployment, only used when `queue.enabled` is set.
+# Image, arguments, environment, config, security context and extra volumes are shared with the frontend.
+worker:
+  # -- Number of worker replicas
+  replicaCount: 2
+  # @schema type:[integer, null]
+  # -- Number of assets a worker builds at the same time. Defaults to `config.build.maxConcurrency`.
+  maxConcurrency:
+  # -- Deployment strategy of the workers
+  strategy:
+    type: RollingUpdate
+  # -- Seconds a worker gets to shut down. An unfinished build is redelivered to another worker.
+  terminationGracePeriodSeconds: 30
+  # -- Liveness probe of the workers; a worker serves `/healthz` on the http port.
+  livenessProbe: {}
+  # -- Readiness probe of the workers; a worker serves `/readyz` on the http port, reporting the connection to the queue.
+  readinessProbe: {}
+  # @schema additionalProperties:true
+  # -- Volume source of the scratch space (mounted at /tmp), where the workers keep the Talos artifacts and assemble the images.
+  # A disk image takes several GB of writes: on nodes with a slow root disk use a faster volume, e.g. a generic ephemeral volume
+  # (`ephemeral.volumeClaimTemplate`, together with `podSecurityContext.fsGroup`).
+  scratchVolume:
+    emptyDir: {}
+  # -- Resources of the workers. A build needs about one CPU, memory depends on the image format.
+  resources: {}
+  # -- Annotations for the worker pods
+  podAnnotations: {}
+  # -- Labels for the worker pods
+  podLabels: {}
+  # -- Node selector for the worker pods
+  nodeSelector: {}
+  # -- Affinity for the worker pods
+  affinity: {}
+  # -- Topology spread constraints for the worker pods
+  topologySpreadConstraints: []
+  # -- Tolerations for the worker pods
+  tolerations: []
+
+# -- Bundled dependencies for demos, tests and benchmarks.
+# Single replicas without TLS and with static credentials: do not use them in production.
+# The registries are services named after the release, e.g. `image-factory-registry:5000` and
+# `image-factory-registry-mirror:5000` for a release called `image-factory`.
+# Point `config.artifacts` and `config.cache` to them (with `insecure: true`).
+demo:
+  # -- Annotations for the pods of the bundled dependencies
+  podAnnotations: {}
+  # RabbitMQ server for `queue`
+  rabbitmq:
+    # -- Deploy a RabbitMQ server
+    enabled: false
+    image:
+      repository: rabbitmq
+      tag: 4-management
+    # -- RabbitMQ user
+    username: image-factory
+    # -- RabbitMQ password
+    password: image-factory
+    resources: {}
+    nodeSelector: {}
+  # Valkey server for `queue`, an alternative to RabbitMQ
+  valkey:
+    # -- Deploy a Valkey server
+    enabled: false
+    image:
+      repository: valkey/valkey
+      tag: "8"
+    # -- Valkey password
+    password: image-factory
+    resources: {}
+    nodeSelector: {}
+  # OCI registry for schematics, cached assets and installer images
+  registry:
+    # -- Deploy an OCI registry
+    enabled: false
+    image:
+      repository: ghcr.io/distribution/distribution
+      tag: 3.1.0
+    service:
+      # -- Service type; NodePort makes the registry available to the container runtime of the nodes
+      type: ClusterIP
+      # @schema type:[integer, null]
+      # -- Node port, if the service type is NodePort
+      nodePort:
+    persistence:
+      # -- Keep the registry content in a PersistentVolumeClaim instead of an emptyDir
+      enabled: false
+      storageClassName: ""
+      size: 50Gi
+    resources: {}
+    nodeSelector: {}
+  # Pull-through mirror of the registry with the Talos artifacts
+  registryMirror:
+    # -- Deploy a pull-through registry mirror
+    enabled: false
+    # -- Registry to mirror
+    remoteURL: https://ghcr.io
+    image:
+      repository: ghcr.io/distribution/distribution
+      # 3.1.0 does not list tags through a pull-through cache, which the factory needs to discover Talos versions
+      tag: edge
+    service:
+      type: ClusterIP
+      # @schema type:[integer, null]
+      nodePort:
+    persistence:
+      enabled: false
+      storageClassName: ""
+      size: 20Gi
+    resources: {}
+    nodeSelector: {}

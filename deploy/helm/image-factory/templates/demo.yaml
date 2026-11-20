@@ -1,0 +1,297 @@
+{{- /*
+Bundled dependencies for demos, tests and benchmarks: a RabbitMQ or Valkey server, an OCI registry
+and a pull-through registry mirror. They are single replicas without TLS, with static
+credentials - do not use them in production.
+*/ -}}
+{{- define "image-factory.demo.labels" -}}
+helm.sh/chart: {{ include "image-factory.chart" .root }}
+{{ include "image-factory.demo.selectorLabels" . }}
+app.kubernetes.io/managed-by: {{ .root.Release.Service }}
+{{- end }}
+
+{{- define "image-factory.demo.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "image-factory.name" .root }}-{{ .component }}
+app.kubernetes.io/instance: {{ .root.Release.Name }}
+{{- end }}
+
+{{- /*
+An OCI registry (distribution). Takes a dict with "root", "component", "values" and "env".
+*/ -}}
+{{- define "image-factory.demo.registry" -}}
+{{- $name := printf "%s-%s" (include "image-factory.fullname" .root) .component }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "image-factory.namespace" .root }}
+  labels:
+    {{- include "image-factory.demo.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "image-factory.demo.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .root.Values.demo.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "image-factory.demo.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: registry
+          image: "{{ .values.image.repository }}:{{ .values.image.tag }}"
+          env:
+            - name: OTEL_TRACES_EXPORTER
+              value: none
+            - name: REGISTRY_LOG_LEVEL
+              value: warn
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            {{- with .env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: registry
+              containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: registry
+          {{- with .values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/registry
+      volumes:
+        - name: data
+          {{- if .values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ $name }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "image-factory.namespace" .root }}
+  labels:
+    {{- include "image-factory.demo.labels" . | nindent 4 }}
+spec:
+  type: {{ .values.service.type }}
+  ports:
+    - name: registry
+      port: 5000
+      targetPort: registry
+      {{- if and (eq .values.service.type "NodePort") .values.service.nodePort }}
+      nodePort: {{ .values.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "image-factory.demo.selectorLabels" . | nindent 4 }}
+{{- if .values.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "image-factory.namespace" .root }}
+  labels:
+    {{- include "image-factory.demo.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .values.persistence.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .values.persistence.size }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.demo.registry.enabled }}
+---
+{{ include "image-factory.demo.registry" (dict "root" . "component" "registry" "values" .Values.demo.registry) }}
+{{- end }}
+{{- if .Values.demo.registryMirror.enabled }}
+---
+{{ include "image-factory.demo.registry" (dict "root" . "component" "registry-mirror" "values" .Values.demo.registryMirror "env" (list (dict "name" "REGISTRY_PROXY_REMOTEURL" "value" .Values.demo.registryMirror.remoteURL))) }}
+{{- end }}
+{{- if .Values.demo.rabbitmq.enabled }}
+{{- $ctx := dict "root" . "component" "rabbitmq" }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "image-factory.fullname" . }}-rabbitmq
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+type: Opaque
+stringData:
+  RABBITMQ_DEFAULT_USER: {{ .Values.demo.rabbitmq.username | quote }}
+  RABBITMQ_DEFAULT_PASS: {{ .Values.demo.rabbitmq.password | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-rabbitmq
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "image-factory.demo.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.demo.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "image-factory.demo.labels" $ctx | nindent 8 }}
+    spec:
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.demo.rabbitmq.image.repository }}:{{ .Values.demo.rabbitmq.image.tag }}"
+          envFrom:
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-rabbitmq
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          readinessProbe:
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 10
+          {{- with .Values.demo.rabbitmq.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- with .Values.demo.rabbitmq.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-rabbitmq
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+    - name: management
+      port: 15672
+      targetPort: management
+  selector:
+    {{- include "image-factory.demo.selectorLabels" $ctx | nindent 4 }}
+{{- end }}
+{{- if .Values.demo.valkey.enabled }}
+{{- $ctx := dict "root" . "component" "valkey" }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+type: Opaque
+stringData:
+  VALKEY_PASSWORD: {{ .Values.demo.valkey.password | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "image-factory.demo.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.demo.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "image-factory.demo.labels" $ctx | nindent 8 }}
+    spec:
+      containers:
+        - name: valkey
+          image: "{{ .Values.demo.valkey.image.repository }}:{{ .Values.demo.valkey.image.tag }}"
+          args: ["--requirepass", "$(VALKEY_PASSWORD)", "--appendonly", "yes"]
+          envFrom:
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-valkey
+          ports:
+            - name: valkey
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: valkey
+          {{- with .Values.demo.valkey.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- with .Values.demo.valkey.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
+  selector:
+    {{- include "image-factory.demo.selectorLabels" $ctx | nindent 4 }}
+{{- end }}

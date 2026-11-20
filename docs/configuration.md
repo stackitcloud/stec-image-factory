@@ -451,6 +451,71 @@ NegativeTTL sets the time-to-live for negative cache entries (schematics not fou
 
 ---
 
+### `queue`
+
+Queue distributes asset builds across several replicas (horizontal scaling).
+
+---
+
+### `queue.mode`
+
+- **Type:** `string`
+- **Env:** `QUEUE_MODE`
+
+Mode selects the role of this replica: "standalone" (default, no queue), "frontend" or "worker".
+
+---
+
+### `queue.url`
+
+- **Type:** `string`
+- **Env:** `QUEUE_URL`
+
+URL is the URL of the queue server, its scheme selects the backend:
+RabbitMQ (amqp://user:password@rabbitmq:5672/, amqps://) or
+Valkey (valkey://user:password@valkey:6379/0, valkeys://, redis://, rediss://).
+Required for the frontend and worker modes.
+
+---
+
+### `queue.requestQueue`
+
+- **Type:** `string`
+- **Env:** `QUEUE_REQUESTQUEUE`
+
+RequestQueue is the name of the RabbitMQ queue (Valkey stream) for the build requests.
+
+---
+
+### `queue.resultExchange`
+
+- **Type:** `string`
+- **Env:** `QUEUE_RESULTEXCHANGE`
+
+ResultExchange is the name of the RabbitMQ exchange (Valkey Pub/Sub channel) for the build results.
+
+---
+
+### `queue.buildTimeout`
+
+- **Type:** `time.Duration`
+- **Env:** `QUEUE_BUILDTIMEOUT`
+
+BuildTimeout limits the time a frontend waits for the workers to build an asset,
+including the time the request spends in the queue.
+
+---
+
+### `queue.recoveryTimeout`
+
+- **Type:** `time.Duration`
+- **Env:** `QUEUE_RECOVERYTIMEOUT`
+
+RecoveryTimeout is the time after which the build request of a worker which stopped
+responding is taken over by another worker. Valkey only, RabbitMQ tracks the connection.
+
+---
+
 ### `metrics`
 
 Metrics holds configuration for the Prometheus metrics endpoint.
@@ -602,6 +667,15 @@ Enabled enables SecureBoot asset generation.
 ### `artifacts`
 
 Artifacts defines names and references for various images used by the factory.
+
+---
+
+### `artifacts.overrideSourceImageRegistry`
+
+- **Type:** `string`
+- **Env:** `ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY`
+
+Replace the image registry defined in the extension/overlay image with the one defined here
 
 ---
 
@@ -875,6 +949,15 @@ TalosVersionRecheckInterval sets the interval at which the image factory recheck
 - **Env:** `ARTIFACTS_REFRESHINTERVAL`
 
 RefreshInterval specifies how often the image factory should refresh its connection to registries.
+
+---
+
+### `artifacts.skipVersionfilter`
+
+- **Type:** `bool`
+- **Env:** `ARTIFACTS_SKIPVERSIONFILTER`
+
+Whether to skip beta/alpha versions and such when obtaining valid Talos versions
 
 ---
 
@@ -1532,12 +1615,14 @@ artifacts:
             namespace: siderolabs
             registry: ghcr.io
             repository: ""
+    overrideSourceImageRegistry: ""
     refreshInterval: 5m0s
     schematic:
         insecure: false
         namespace: siderolabs/image-factory
         registry: ghcr.io
         repository: schematics
+    skipVersionfilter: false
     talosVersionRecheckInterval: 15m0s
 audit:
     file:
@@ -1657,6 +1742,13 @@ http:
     keyFile: ""
 metrics:
     addr: :2122
+queue:
+    buildTimeout: 30m0s
+    mode: standalone
+    recoveryTimeout: 1m0s
+    requestQueue: image-factory.build-requests
+    resultExchange: image-factory.build-results
+    url: ""
 registry:
     debug: false
     jobs: 64
@@ -1699,11 +1791,13 @@ IF_ARTIFACTS_INSTALLER_INTERNAL_INSECURE=false
 IF_ARTIFACTS_INSTALLER_INTERNAL_NAMESPACE=siderolabs
 IF_ARTIFACTS_INSTALLER_INTERNAL_REGISTRY=ghcr.io
 IF_ARTIFACTS_INSTALLER_INTERNAL_REPOSITORY=
+IF_ARTIFACTS_OVERRIDESOURCEIMAGEREGISTRY=
 IF_ARTIFACTS_REFRESHINTERVAL=5m0s
 IF_ARTIFACTS_SCHEMATIC_INSECURE=false
 IF_ARTIFACTS_SCHEMATIC_NAMESPACE=siderolabs/image-factory
 IF_ARTIFACTS_SCHEMATIC_REGISTRY=ghcr.io
 IF_ARTIFACTS_SCHEMATIC_REPOSITORY=schematics
+IF_ARTIFACTS_SKIPVERSIONFILTER=false
 IF_ARTIFACTS_TALOSVERSIONRECHECKINTERVAL=15m0s
 IF_AUDIT_FILE_MAXAGE=30
 IF_AUDIT_FILE_MAXBACKUPS=16
@@ -1792,6 +1886,12 @@ IF_HTTP_EXTERNALURL=https://localhost/
 IF_HTTP_HTTPLISTENADDR=:8080
 IF_HTTP_KEYFILE=
 IF_METRICS_ADDR=:2122
+IF_QUEUE_BUILDTIMEOUT=30m0s
+IF_QUEUE_MODE=standalone
+IF_QUEUE_RECOVERYTIMEOUT=1m0s
+IF_QUEUE_REQUESTQUEUE=image-factory.build-requests
+IF_QUEUE_RESULTEXCHANGE=image-factory.build-results
+IF_QUEUE_URL=
 IF_REGISTRY_DEBUG=false
 IF_REGISTRY_JOBS=64
 IF_SECUREBOOT_AWSKMS_CERTARN=

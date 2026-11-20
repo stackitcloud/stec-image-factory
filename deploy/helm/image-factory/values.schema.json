@@ -105,6 +105,195 @@
       },
       "additionalProperties": true
     },
+    "demo": {
+      "description": "Bundled dependencies for demos, tests and benchmarks. Single replicas without TLS and with static credentials: do not use them in production. The registries are services named after the release, e.g. `image-factory-registry:5000` and `image-factory-registry-mirror:5000` for a release called `image-factory`. Point `config.artifacts` and `config.cache` to them (with `insecure: true`).",
+      "type": "object",
+      "properties": {
+        "podAnnotations": {
+          "description": "Annotations for the pods of the bundled dependencies",
+          "type": "object"
+        },
+        "rabbitmq": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "description": "Deploy a RabbitMQ server",
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object"
+            },
+            "password": {
+              "description": "RabbitMQ password",
+              "type": "string"
+            },
+            "resources": {
+              "type": "object"
+            },
+            "username": {
+              "description": "RabbitMQ user",
+              "type": "string"
+            }
+          }
+        },
+        "registry": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "description": "Deploy an OCI registry",
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object"
+            },
+            "persistence": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "description": "Keep the registry content in a PersistentVolumeClaim instead of an emptyDir",
+                  "type": "boolean"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "storageClassName": {
+                  "type": "string"
+                }
+              }
+            },
+            "resources": {
+              "type": "object"
+            },
+            "service": {
+              "type": "object",
+              "properties": {
+                "nodePort": {
+                  "description": "Node port, if the service type is NodePort",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "description": "Service type; NodePort makes the registry available to the container runtime of the nodes",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "registryMirror": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "description": "Deploy a pull-through registry mirror",
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object"
+            },
+            "persistence": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "storageClassName": {
+                  "type": "string"
+                }
+              }
+            },
+            "remoteURL": {
+              "description": "Registry to mirror",
+              "type": "string"
+            },
+            "resources": {
+              "type": "object"
+            },
+            "service": {
+              "type": "object",
+              "properties": {
+                "nodePort": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "valkey": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "description": "Deploy a Valkey server",
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object"
+            },
+            "password": {
+              "description": "Valkey password",
+              "type": "string"
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
     "env": {
       "description": "Environment variables to pass to Image Factory",
       "type": "array"
@@ -357,6 +546,24 @@
     "podSecurityContext": {
       "type": "object"
     },
+    "queue": {
+      "description": "Horizontal scaling: build assets on a pool of workers. With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend and publish a build request to the queue (RabbitMQ or Valkey) for every asset missing in the cache. The replicas of the worker Deployment build the assets and push them to the cache. Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Split the Image Factory into frontend and worker replicas.",
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "description": "Name of an existing Secret containing the queue URL in the data key \"url\". Takes precedence over `queue.url`.",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of the queue server: RabbitMQ (amqp://user:password@rabbitmq:5672/) or Valkey (valkey://user:password@valkey:6379/0). It is stored in a Secret. Defaults to the bundled server if `demo.rabbitmq.enabled` or `demo.valkey.enabled` is set.",
+          "type": "string"
+        }
+      }
+    },
     "readinessProbe": {
       "type": "object"
     },
@@ -583,6 +790,82 @@
     },
     "tolerations": {
       "type": "array"
+    },
+    "worker": {
+      "description": "Worker Deployment, only used when `queue.enabled` is set. Image, arguments, environment, config, security context and extra volumes are shared with the frontend.",
+      "type": "object",
+      "properties": {
+        "affinity": {
+          "description": "Affinity for the worker pods",
+          "type": "object"
+        },
+        "livenessProbe": {
+          "description": "Liveness probe of the workers; a worker serves `/healthz` on the http port.",
+          "type": "object"
+        },
+        "maxConcurrency": {
+          "description": "Number of assets a worker builds at the same time. Defaults to `config.build.maxConcurrency`.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "nodeSelector": {
+          "description": "Node selector for the worker pods",
+          "type": "object"
+        },
+        "podAnnotations": {
+          "description": "Annotations for the worker pods",
+          "type": "object"
+        },
+        "podLabels": {
+          "description": "Labels for the worker pods",
+          "type": "object"
+        },
+        "readinessProbe": {
+          "description": "Readiness probe of the workers; a worker serves `/readyz` on the http port, reporting the connection to the queue.",
+          "type": "object"
+        },
+        "replicaCount": {
+          "description": "Number of worker replicas",
+          "type": "integer"
+        },
+        "resources": {
+          "description": "Resources of the workers. A build needs about one CPU, memory depends on the image format.",
+          "type": "object"
+        },
+        "scratchVolume": {
+          "description": "Volume source of the scratch space (mounted at /tmp), where the workers keep the Talos artifacts and assemble the images. A disk image takes several GB of writes: on nodes with a slow root disk use a faster volume, e.g. a generic ephemeral volume (`ephemeral.volumeClaimTemplate`, together with `podSecurityContext.fsGroup`).",
+          "type": "object",
+          "properties": {
+            "emptyDir": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": true
+        },
+        "strategy": {
+          "description": "Deployment strategy of the workers",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            }
+          }
+        },
+        "terminationGracePeriodSeconds": {
+          "description": "Seconds a worker gets to shut down. An unfinished build is redelivered to another worker.",
+          "type": "integer"
+        },
+        "tolerations": {
+          "description": "Tolerations for the worker pods",
+          "type": "array"
+        },
+        "topologySpreadConstraints": {
+          "description": "Topology spread constraints for the worker pods",
+          "type": "array"
+        }
+      }
     }
   }
 }

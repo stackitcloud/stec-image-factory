@@ -69,9 +69,13 @@ type Options struct {
 	AuthProvider        enterprise.AuthProvider
 	TokenVerifier       enterprise.TokenVerifier
 
-	ExternalURL                      *url.URL
-	ExternalPXEURL                   *url.URL
-	AuditSink                        audit.Sink
+	ExternalURL    *url.URL
+	ExternalPXEURL *url.URL
+	AuditSink      audit.Sink
+	// ImageBuilder overrides the builder of the image assets (e.g. to build them on other replicas).
+	//
+	// Defaults to the asset builder.
+	ImageBuilder                     asset.ImageAssetBuilder
 	InstallerInternalRepository      name.Repository
 	InstallerInternalNameOptions     []name.Option
 	InstallerExternalRepository      name.Repository
@@ -105,9 +109,15 @@ func NewFrontend(
 	frontend := &Frontend{}
 	schematicService := schematic.NewService(schematicFactory, opts.AuthProvider != nil, enterprise.Enabled())
 	frontend.schematicAPI = applicationapi.NewSchematicHandler(schematicService)
+
+	var imageBuilder asset.ImageAssetBuilder = assetBuilder
+	if opts.ImageBuilder != nil {
+		imageBuilder = opts.ImageBuilder
+	}
+
 	imageService := asset.NewImageService(
 		schematicService,
-		assetBuilder,
+		imageBuilder,
 		asset.NewImageProfileEnhancer(artifactsManager, secureBootService),
 		asset.ImageServiceOptions{
 			ChecksumGenerator:  checksummer,

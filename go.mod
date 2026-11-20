@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	cloud.google.com/go/auth v0.24.1
 	github.com/CalebQ42/squashfs v1.4.1
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/anchore/clio v0.1.1
 	github.com/anchore/go-logger v0.2.0
 	github.com/anchore/grype v0.120.1
@@ -36,6 +37,8 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/ory/dockertest/v4 v4.0.0
 	github.com/prometheus/client_golang v1.25.0
+	github.com/rabbitmq/amqp091-go v1.16.0
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rs/cors v1.11.1
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/siderolabs/crypto v0.6.5
@@ -458,6 +461,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/zclconf/go-cty v1.19.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	gitlab.com/gitlab-org/api/client-go v1.46.0 // indirect
@@ -474,6 +478,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.podman.io/image/v5 v5.41.2 // indirect
 	go.podman.io/storage v1.64.1 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect

@@ -31,6 +31,14 @@ type ImageAssetBuilder interface {
 	Build(ctx context.Context, profile talosprofile.Profile, version, path, filename string) (BootAsset, error)
 }
 
+// ImageRequestBuilder is an optional extension of ImageAssetBuilder for builders which need the
+// image request the profile was resolved from, e.g. to hand the build over to another replica.
+//
+// The request path has no sidecar suffix, and the filename is always set.
+type ImageRequestBuilder interface {
+	BuildRequest(ctx context.Context, request ImageRequest, profile talosprofile.Profile, version string) (BootAsset, error)
+}
+
 // ImageProfileEnhancer applies schematic customization to an image profile.
 type ImageProfileEnhancer func(
 	ctx context.Context,
@@ -199,7 +207,19 @@ func (service *ImageService) Resolve(ctx context.Context, request ImageRequest) 
 		filename = path
 	}
 
-	builtAsset, err := service.builder.Build(ctx, imageProfile, version.String(), path, filename)
+	var builtAsset BootAsset
+
+	if requestBuilder, ok := service.builder.(ImageRequestBuilder); ok {
+		builtAsset, err = requestBuilder.BuildRequest(ctx, ImageRequest{
+			SchematicID: request.SchematicID,
+			Version:     request.Version,
+			Path:        path,
+			Filename:    filename,
+		}, imageProfile, version.String())
+	} else {
+		builtAsset, err = service.builder.Build(ctx, imageProfile, version.String(), path, filename)
+	}
+
 	if err != nil {
 		return ResolvedImage{}, err
 	}

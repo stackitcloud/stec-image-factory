@@ -45,6 +45,9 @@ import (
 	auditlog "github.com/siderolabs/image-factory/internal/audit/sink/log"
 	frontendhttp "github.com/siderolabs/image-factory/internal/frontend/http"
 	"github.com/siderolabs/image-factory/internal/image/signer"
+	"github.com/siderolabs/image-factory/internal/queue"
+	"github.com/siderolabs/image-factory/internal/queue/rabbitmq"
+	"github.com/siderolabs/image-factory/internal/queue/valkey"
 	"github.com/siderolabs/image-factory/internal/remotewrap"
 	"github.com/siderolabs/image-factory/internal/schematic"
 	schematiccache "github.com/siderolabs/image-factory/internal/schematic/storage/cache"
@@ -52,6 +55,7 @@ import (
 	"github.com/siderolabs/image-factory/internal/secureboot"
 	"github.com/siderolabs/image-factory/internal/version"
 	"github.com/siderolabs/image-factory/pkg/enterprise"
+	schematicpkg "github.com/siderolabs/image-factory/pkg/schematic"
 )
 
 // RunFactory runs the image factory with specified options.
@@ -107,6 +111,10 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 		return err
 	}
 
+	if opts.Queue.Mode == QueueModeWorker {
+		return runQueueWorker(ctx, logger, eg, configFactory, artifactsManager, assetBuilder, opts)
+	}
+
 	secureBootService, err := buildSecureBootService(opts)
 	if err != nil {
 		return err
@@ -148,10 +156,12 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 
 	defer auditSink.Close() //nolint:errcheck
 
-	frontendOptions, err := buildFrontendOptions(cacheImageSigner, authProvider, opts)
+	frontendOptions, closeQueue, err := buildQueueFrontendOptions(ctx, logger, eg, assetBuilder, assetCache, cacheImageSigner, authProvider, opts)
 	if err != nil {
 		return err
 	}
+
+	defer closeQueue()
 
 	frontendOptions.AuditSink = auditSink
 	frontendOptions.TokenVerifier = tokenVerifier
@@ -179,6 +189,144 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 	}
 
 	runHTTPServer(ctx, logger, eg, frontendHTTP, opts)
+
+	if opts.Metrics.Addr != "" {
+		runMetricsServer(ctx, logger, eg, opts)
+	}
+
+	return eg.Wait()
+}
+
+func buildQueueBroker(logger *zap.Logger, opts Options) (queue.Broker, error) {
+	backend, err := opts.Queue.Backend()
+	if err != nil {
+		return nil, err
+	}
+
+	var broker queue.Broker
+
+	switch backend {
+	case QueueBackendValkey:
+		broker, err = valkey.New(logger, valkey.Options{
+			URL:             opts.Queue.URL,
+			RequestQueue:    opts.Queue.RequestQueue,
+			ResultExchange:  opts.Queue.ResultExchange,
+			RecoveryTimeout: opts.Queue.RecoveryTimeout,
+		})
+	default:
+		broker, err = rabbitmq.New(logger, rabbitmq.Options{
+			URL:            opts.Queue.URL,
+			RequestQueue:   opts.Queue.RequestQueue,
+			ResultExchange: opts.Queue.ResultExchange,
+		})
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize build queue: %w", err)
+	}
+
+	return broker, nil
+}
+
+// buildQueueFrontendOptions builds the frontend options.
+//
+// On a frontend replica (queue.mode: frontend) the image builds are handed over to the workers.
+// The returned function releases the connection to the queue.
+func buildQueueFrontendOptions(
+	ctx context.Context,
+	logger *zap.Logger,
+	eg *errgroup.Group,
+	assetBuilder *asset.Builder,
+	assetCache assetcache.Cache,
+	cacheImageSigner signer.Signer,
+	authProvider enterprise.AuthProvider,
+	opts Options,
+) (frontendhttp.Options, func(), error) {
+	frontendOptions, err := buildFrontendOptions(cacheImageSigner, authProvider, opts)
+	if err != nil {
+		return frontendOptions, nil, err
+	}
+
+	if opts.Queue.Mode != QueueModeFrontend {
+		return frontendOptions, func() {}, nil
+	}
+
+	broker, err := buildQueueBroker(logger, opts)
+	if err != nil {
+		return frontendOptions, nil, err
+	}
+
+	dispatcher := queue.NewDispatcher(logger, assetBuilder, assetCache, broker, queue.DispatcherOptions{
+		MetricsNamespace: opts.Metrics.Namespace,
+		BuildTimeout:     opts.Queue.BuildTimeout,
+	})
+
+	prometheus.MustRegister(dispatcher)
+
+	eg.Go(func() error { return dispatcher.Run(ctx) })
+
+	frontendOptions.ImageBuilder = dispatcher
+
+	return frontendOptions, func() { broker.Close() }, nil //nolint:errcheck
+}
+
+// rawSchematics gives the worker access to every schematic: the frontend has
+// already checked that the user is allowed to use the schematic of a build request.
+type rawSchematics struct {
+	factory *schematic.Factory
+}
+
+func (s rawSchematics) Get(ctx context.Context, id string) (*schematicpkg.Schematic, error) {
+	return s.factory.GetRaw(ctx, id)
+}
+
+// runQueueWorker runs the factory as a worker: it builds the assets requested by the frontends.
+//
+// Instead of the HTTP frontend, the worker serves only the health endpoints.
+func runQueueWorker(
+	ctx context.Context,
+	logger *zap.Logger,
+	eg *errgroup.Group,
+	configFactory *schematic.Factory,
+	artifactsManager *artifacts.Manager,
+	assetBuilder *asset.Builder,
+	opts Options,
+) error {
+	secureBootService, err := buildSecureBootService(opts)
+	if err != nil {
+		return err
+	}
+
+	broker, err := buildQueueBroker(logger, opts)
+	if err != nil {
+		return err
+	}
+
+	defer broker.Close() //nolint:errcheck
+
+	workerID, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	imageService := asset.NewImageService(
+		rawSchematics{factory: configFactory},
+		assetBuilder,
+		asset.NewImageProfileEnhancer(artifactsManager, secureBootService),
+		asset.ImageServiceOptions{Logger: logger},
+	)
+
+	worker := queue.NewWorker(logger, imageService, broker, queue.WorkerOptions{
+		ID:               workerID,
+		MetricsNamespace: opts.Metrics.Namespace,
+		Concurrency:      opts.Build.MaxConcurrency,
+	})
+
+	prometheus.MustRegister(worker)
+
+	eg.Go(func() error { return worker.Run(ctx) })
+
+	runHealthServer(ctx, logger, eg, worker, opts)
 
 	if opts.Metrics.Addr != "" {
 		runMetricsServer(ctx, logger, eg, opts)
@@ -498,6 +646,43 @@ func runMetricsServer(ctx context.Context, logger *zap.Logger, eg *errgroup.Grou
 		defer shutdownCtxCancel()
 
 		return metricsServer.Shutdown(shutdownCtx) //nolint:contextcheck
+	})
+}
+
+// runHealthServer serves the health endpoints of a worker, which has no HTTP frontend.
+func runHealthServer(ctx context.Context, logger *zap.Logger, eg *errgroup.Group, worker *queue.Worker, opts Options) {
+	var healthMux http.ServeMux
+
+	healthMux.HandleFunc("/healthz", func(http.ResponseWriter, *http.Request) {})
+	healthMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if err := worker.Ready(r.Context()); err != nil {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+		}
+	})
+
+	healthServer := &http.Server{
+		Addr:    opts.HTTP.ListenAddr,
+		Handler: &healthMux,
+	}
+
+	eg.Go(func() error {
+		logger.Info("serving health", zap.String("listen_addr", opts.HTTP.ListenAddr))
+
+		err := healthServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+
+		return err
+	})
+
+	eg.Go(func() error {
+		<-ctx.Done()
+
+		shutdownCtx, shutdownCtxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCtxCancel()
+
+		return healthServer.Shutdown(shutdownCtx) //nolint:contextcheck
 	})
 }
 

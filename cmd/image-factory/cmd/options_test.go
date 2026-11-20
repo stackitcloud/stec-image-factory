@@ -225,6 +225,91 @@ func TestOptionsValidate(t *testing.T) {
 		opts        cmd.Options
 	}{
 		{
+			name: "unknown queue mode",
+			opts: cmd.Options{
+				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{Mode: "leader"},
+			},
+			expectError: "queue.mode must be one of",
+		},
+		{
+			name: "worker without a queue URL",
+			opts: cmd.Options{
+				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{Mode: cmd.QueueModeWorker},
+			},
+			expectError: `queue.url is required when queue.mode is "worker"`,
+		},
+		{
+			name: "frontend without a build timeout",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:           cmd.QueueModeFrontend,
+					URL:            "amqp://rabbitmq:5672/",
+					RequestQueue:   "requests",
+					ResultExchange: "results",
+				},
+			},
+			expectError: "queue.buildTimeout must be positive",
+		},
+		{
+			name: "valid frontend",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:           cmd.QueueModeFrontend,
+					URL:            "amqp://rabbitmq:5672/",
+					RequestQueue:   "requests",
+					ResultExchange: "results",
+					BuildTimeout:   time.Minute,
+				},
+			},
+		},
+		{
+			name: "unknown queue backend",
+			opts: cmd.Options{
+				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{Mode: cmd.QueueModeWorker, URL: "kafka://kafka:9092/"},
+			},
+			expectError: `queue.url has an unsupported scheme "kafka"`,
+		},
+		{
+			name: "valkey without a recovery timeout",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:           cmd.QueueModeWorker,
+					URL:            "valkey://valkey:6379/",
+					RequestQueue:   "requests",
+					ResultExchange: "results",
+					BuildTimeout:   time.Minute,
+				},
+			},
+			expectError: "queue.recoveryTimeout must be at least 1s",
+		},
+		{
+			name: "valid valkey worker",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:            cmd.QueueModeWorker,
+					URL:             "valkeys://user:secret@valkey:6379/1",
+					RequestQueue:    "requests",
+					ResultExchange:  "results",
+					BuildTimeout:    time.Minute,
+					RecoveryTimeout: time.Minute,
+				},
+			},
+		},
+		{
+			name: "queue settings ignored in standalone mode",
+			opts: cmd.Options{
+				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{Mode: cmd.QueueModeStandalone},
+			},
+		},
+		{
 			name: "valid http",
 			opts: cmd.Options{
 				HTTP: cmd.HTTPOptions{ExternalURL: "http://factory.example.com:8080"},

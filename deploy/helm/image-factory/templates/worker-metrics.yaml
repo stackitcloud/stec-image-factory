@@ -1,0 +1,63 @@
+{{- if and .Values.queue.enabled .Values.service.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-worker-metrics
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.worker.labels" . | nindent 4 }}
+    {{- with .Values.service.metrics.service.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # headless: each worker is a scrape target of its own
+  clusterIP: None
+  ports:
+  - name: metrics
+    protocol: TCP
+    port: {{ .Values.service.metrics.service.servicePort }}
+    targetPort: metrics
+  selector:
+    {{- include "image-factory.worker.selectorLabels" . | nindent 4 }}
+{{- if .Values.service.metrics.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "image-factory.fullname" . }}-worker
+  namespace: {{ default (include "image-factory.namespace" .) .Values.service.metrics.serviceMonitor.namespace }}
+  labels:
+    {{- include "image-factory.worker.labels" . | nindent 4 }}
+    {{- with .Values.service.metrics.serviceMonitor.selector }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.service.metrics.serviceMonitor.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.metrics.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  endpoints:
+    - port: metrics
+      {{- with .Values.service.metrics.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.service.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      path: /metrics
+      honorLabels: {{ .Values.service.metrics.serviceMonitor.honorLabels }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "image-factory.namespace" . }}
+  selector:
+    matchLabels:
+      {{- include "image-factory.worker.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

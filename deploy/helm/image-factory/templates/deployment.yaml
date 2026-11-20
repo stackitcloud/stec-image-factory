@@ -67,9 +67,14 @@ spec:
           args:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.env }}
+          {{- if or .Values.env .Values.queue.enabled }}
           env:
+            {{- if .Values.queue.enabled }}
+            {{- include "image-factory.queueEnv" (dict "root" . "mode" "frontend") | nindent 12 }}
+            {{- end }}
+            {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           {{- with .Values.envFrom }}
           envFrom:

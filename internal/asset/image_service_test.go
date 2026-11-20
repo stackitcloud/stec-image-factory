@@ -52,6 +52,38 @@ func TestImageServiceResolvesAndBuildsRequestedAsset(t *testing.T) {
 	require.Equal(t, "talos-kernel", builder.filename)
 }
 
+func TestImageServicePassesRequestToRequestBuilder(t *testing.T) {
+	t.Parallel()
+
+	builder := &requestBuilder{asset: &bootAsset{}}
+	service := asset.NewImageService(
+		schematicSource{configuration: &schematicpkg.Schematic{}},
+		builder,
+		func(_ context.Context, profile talosprofile.Profile, _ *schematicpkg.Schematic, _ string) (talosprofile.Profile, error) {
+			return profile, nil
+		},
+		asset.ImageServiceOptions{ChecksumGenerator: &checksumGenerator{}},
+	)
+
+	_, err := service.Resolve(t.Context(), asset.ImageRequest{
+		SchematicID:   "schematic-id",
+		Version:       "v1.9.0",
+		Path:          "kernel-amd64.sha256",
+		AllowRedirect: true,
+	})
+	require.NoError(t, err)
+
+	// the builder gets what another replica needs to resolve the same asset: no sidecar, no delivery options
+	require.Equal(t, asset.ImageRequest{
+		SchematicID: "schematic-id",
+		Version:     "v1.9.0",
+		Path:        "kernel-amd64",
+		Filename:    "kernel-amd64",
+	}, builder.request)
+	require.Equal(t, "1.9.0", builder.version)
+	require.Empty(t, builder.path, "Build should not be called")
+}
+
 func TestImageServiceSelectsChecksumDelivery(t *testing.T) {
 	t.Parallel()
 
@@ -178,6 +210,19 @@ func (builder *assetBuilder) Build(_ context.Context, _ talosprofile.Profile, ve
 	builder.version = version
 	builder.path = path
 	builder.filename = filename
+
+	return builder.asset, nil
+}
+
+type requestBuilder struct {
+	assetBuilder
+
+	request asset.ImageRequest
+}
+
+func (builder *requestBuilder) BuildRequest(_ context.Context, request asset.ImageRequest, _ talosprofile.Profile, version string) (asset.BootAsset, error) {
+	builder.request = request
+	builder.version = version
 
 	return builder.asset, nil
 }

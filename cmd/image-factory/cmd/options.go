@@ -392,19 +392,45 @@ type QueueOptions struct {
 	// Mode selects the role of this replica: "standalone" (default, no queue), "frontend" or "worker".
 	Mode string `koanf:"mode"`
 
-	// URL is the AMQP URL of the RabbitMQ server, e.g. amqp://user:password@rabbitmq:5672/.
+	// URL is the URL of the queue server, its scheme selects the backend:
+	// RabbitMQ (amqp://user:password@rabbitmq:5672/, amqps://) or
+	// Valkey (valkey://user:password@valkey:6379/0, valkeys://, redis://, rediss://).
 	// Required for the frontend and worker modes.
 	URL string `koanf:"url"`
 
-	// RequestQueue is the name of the RabbitMQ queue for the build requests.
+	// RequestQueue is the name of the RabbitMQ queue (Valkey stream) for the build requests.
 	RequestQueue string `koanf:"requestQueue"`
 
-	// ResultExchange is the name of the RabbitMQ exchange for the build results.
+	// ResultExchange is the name of the RabbitMQ exchange (Valkey Pub/Sub channel) for the build results.
 	ResultExchange string `koanf:"resultExchange"`
 
 	// BuildTimeout limits the time a frontend waits for the workers to build an asset,
 	// including the time the request spends in the queue.
 	BuildTimeout time.Duration `koanf:"buildTimeout"`
+
+	// RecoveryTimeout is the time after which the build request of a worker which stopped
+	// responding is taken over by another worker. Valkey only, RabbitMQ tracks the connection.
+	RecoveryTimeout time.Duration `koanf:"recoveryTimeout"`
+}
+
+// Queue backends.
+const (
+	QueueBackendRabbitMQ = "rabbitmq"
+	QueueBackendValkey   = "valkey"
+)
+
+// Backend returns the queue backend selected by the URL scheme.
+func (o *QueueOptions) Backend() (string, error) {
+	scheme, _, _ := strings.Cut(o.URL, "://")
+
+	switch scheme {
+	case "amqp", "amqps":
+		return QueueBackendRabbitMQ, nil
+	case "valkey", "valkeys", "redis", "rediss":
+		return QueueBackendValkey, nil
+	default:
+		return "", fmt.Errorf("queue.url has an unsupported scheme %q", scheme)
+	}
 }
 
 func (o *QueueOptions) validate() error {
@@ -418,6 +444,15 @@ func (o *QueueOptions) validate() error {
 
 	if o.URL == "" {
 		return fmt.Errorf("queue.url is required when queue.mode is %q", o.Mode)
+	}
+
+	backend, err := o.Backend()
+	if err != nil {
+		return err
+	}
+
+	if backend == QueueBackendValkey && o.RecoveryTimeout < time.Second {
+		return fmt.Errorf("queue.recoveryTimeout must be at least 1s, got %s", o.RecoveryTimeout)
 	}
 
 	if o.RequestQueue == "" || o.ResultExchange == "" {
@@ -1036,6 +1071,8 @@ var DefaultOptions = Options{
 		RequestQueue:   "image-factory.build-requests",
 		ResultExchange: "image-factory.build-results",
 		BuildTimeout:   30 * time.Minute,
+
+		RecoveryTimeout: time.Minute,
 	},
 
 	Metrics: MetricsOptions{

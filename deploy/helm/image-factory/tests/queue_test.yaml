@@ -193,7 +193,7 @@ tests:
         enabled: true
     asserts:
       - failedTemplate:
-          errorPattern: "queue.url, queue.existingSecret or demo.rabbitmq.enabled is required"
+          errorPattern: "queue.url, queue.existingSecret, demo.rabbitmq.enabled or demo.valkey.enabled is required"
 
   - it: Should default the queue URL to the bundled RabbitMQ
     template: secret-queue.yaml
@@ -207,6 +207,38 @@ tests:
       - equal:
           path: stringData.url
           value: amqp://image-factory:image-factory@RELEASE-NAME-image-factory-rabbitmq:5672/
+
+  - it: Should default the queue URL to the bundled Valkey
+    template: secret-queue.yaml
+    set:
+      queue:
+        enabled: true
+      demo:
+        valkey:
+          enabled: true
+    asserts:
+      - equal:
+          path: stringData.url
+          value: valkey://:image-factory@RELEASE-NAME-image-factory-valkey:6379/
+
+  - it: Should render the bundled Valkey
+    template: demo.yaml
+    set:
+      demo:
+        valkey:
+          enabled: true
+    asserts:
+      # Secret, Deployment, Service
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: valkey/valkey:8
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-image-factory-valkey
+        documentIndex: 2
 
   - it: Should expose the worker metrics
     template: worker-metrics.yaml

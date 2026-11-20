@@ -267,6 +267,42 @@ func TestOptionsValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "unknown queue backend",
+			opts: cmd.Options{
+				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{Mode: cmd.QueueModeWorker, URL: "kafka://kafka:9092/"},
+			},
+			expectError: `queue.url has an unsupported scheme "kafka"`,
+		},
+		{
+			name: "valkey without a recovery timeout",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:           cmd.QueueModeWorker,
+					URL:            "valkey://valkey:6379/",
+					RequestQueue:   "requests",
+					ResultExchange: "results",
+					BuildTimeout:   time.Minute,
+				},
+			},
+			expectError: "queue.recoveryTimeout must be at least 1s",
+		},
+		{
+			name: "valid valkey worker",
+			opts: cmd.Options{
+				HTTP: cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},
+				Queue: cmd.QueueOptions{
+					Mode:            cmd.QueueModeWorker,
+					URL:             "valkeys://user:secret@valkey:6379/1",
+					RequestQueue:    "requests",
+					ResultExchange:  "results",
+					BuildTimeout:    time.Minute,
+					RecoveryTimeout: time.Minute,
+				},
+			},
+		},
+		{
 			name: "queue settings ignored in standalone mode",
 			opts: cmd.Options{
 				HTTP:  cmd.HTTPOptions{ExternalURL: "https://factory.sidero.dev/"},

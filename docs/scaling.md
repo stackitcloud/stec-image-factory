@@ -13,7 +13,7 @@ Instead, what it needs is a real task queue and a split of image factory into tw
 
 ```text
             +----------+  build request   +----------+      +--------+
- client --> | frontend | ---------------> | RabbitMQ | ---> | worker | -+
+ client --> | frontend | ---------------> |  queue   | ---> | worker | -+
             |   (N)    | <--------------- |          | <--- |  (M)   |  |
             +----+-----+   build result   +----------+      +--------+  |
                  |                                                      |
@@ -29,13 +29,15 @@ The asset itself goes through the cache, which every replica uses anyway.
 
 ## Configuration
 
-The role of a replica is selected with [`queue.mode`](configuration.md#queuemode), the queue is a RabbitMQ server given by `queue.url`:
+The role of a replica is selected with [`queue.mode`](configuration.md#queuemode), the queue is a RabbitMQ or a Valkey server given by `queue.url`:
 
 ```yaml
 queue:
   mode: frontend # or: worker
-  url: amqp://user:password@rabbitmq:5672/
+  url: amqp://user:password@rabbitmq:5672/ # or: valkey://user:password@valkey:6379/0
 ```
+
+The scheme of the URL selects the backend: `amqp://` and `amqps://` for RabbitMQ, `valkey://`, `valkeys://` (TLS), `redis://` and `rediss://` for Valkey.
 
 As any other option, both can be set via the environment (`IF_QUEUE_MODE`, `IF_QUEUE_URL`), so that frontends and workers share one configuration file.
 
@@ -45,6 +47,9 @@ Requirements:
   A worker resolves a build request the same way the frontend did; a different configuration makes it build another asset than the frontend is waiting for.
 * A RabbitMQ server (tested with RabbitMQ 4).
   The factory declares what it needs: the queue `queue.requestQueue`, the fanout exchange `queue.resultExchange`, and short-lived exclusive queues named `<requestQueue>.lock.<profile hash>`.
+* Or a Valkey server (tested with Valkey 8; Redis 7 or later works as well).
+  The factory creates the stream `queue.requestQueue` with the consumer group `workers`, publishes to the Pub/Sub channel `queue.resultExchange`, and sets short-lived keys named `<requestQueue>.lock.<profile hash>`.
+  Enable persistence (`appendonly yes`), otherwise the requests in the queue are lost when Valkey restarts.
 
 A worker builds `build.maxConcurrency` assets at the same time, and does not take more requests from the queue than that.
 It serves `/healthz` and `/readyz` on the HTTP listen address, and nothing else.
@@ -67,20 +72,34 @@ worker:
       memory: 2Gi
 ```
 
-For demos and tests the chart can bring its own dependencies, a RabbitMQ server, an OCI registry and a pull-through mirror of `ghcr.io` (`demo.rabbitmq`, `demo.registry`, `demo.registryMirror`).
+For demos and tests the chart can bring its own dependencies, a RabbitMQ or Valkey server, an OCI registry and a pull-through mirror of `ghcr.io` (`demo.rabbitmq`, `demo.valkey`, `demo.registry`, `demo.registryMirror`).
 They are single replicas without TLS and with static credentials, not meant for production.
 
 ## Behavior
 
-* **Cache first.** A frontend dispatches a build only if the asset is not in the cache; cached assets are served without the queue, even if RabbitMQ is down.
+* **Cache first.** A frontend dispatches a build only if the asset is not in the cache; cached assets are served without the queue, even if the queue server is down.
 * **Each asset is built once.** Concurrent requests for the same asset are collapsed on the frontend.
   If two frontends ask for the same asset at the same time, the worker holding the lock for the asset builds it, the other request is dropped, and both frontends get the result.
 * **Client disconnects do not cancel builds.** The build goes on, and the next request finds the asset in the cache.
 * **Failed builds are reported, not retried.** The error of the worker is returned to the client, as it would be by a standalone replica.
-* **Lost workers are covered.** A request is acknowledged only after the build; if a worker goes away, RabbitMQ hands its requests to another worker.
+* **Lost workers are covered.** A request is acknowledged only after the build; if a worker goes away, its requests are handed to another worker.
   The same applies to a worker shutting down.
+  So each request is built at least once, and more than once only if a worker was wrongly taken for lost.
 * **Lost results are covered.** While waiting, a frontend looks into the cache every 15 seconds.
   It gives up after `queue.buildTimeout`, which includes the time in the queue.
+
+### Recovery with Valkey
+
+RabbitMQ notices a lost worker by its broken connection.
+Valkey does not track who works on what, so the workers do it themselves:
+
+* A request stays in the pending list of the stream until the build is done.
+* While building, a worker sends a heartbeat for the request, and refreshes its lock on the asset.
+* A request without a heartbeat for [`queue.recoveryTimeout`](configuration.md#queuerecoverytimeout) (default: 1 minute) is stolen by the next worker with a free slot.
+  The lock expires after half of that time, so the new worker is not locked out.
+* A worker shutting down, or failing to handle a request, gives it back at once.
+
+A lower timeout recovers faster, but a worker which hangs for longer than the timeout (e.g. a network partition) is taken for lost, and the asset is built twice.
 
 What is still built by the frontend itself:
 

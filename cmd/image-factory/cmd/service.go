@@ -47,6 +47,7 @@ import (
 	"github.com/siderolabs/image-factory/internal/image/signer"
 	"github.com/siderolabs/image-factory/internal/queue"
 	"github.com/siderolabs/image-factory/internal/queue/rabbitmq"
+	"github.com/siderolabs/image-factory/internal/queue/valkey"
 	"github.com/siderolabs/image-factory/internal/remotewrap"
 	"github.com/siderolabs/image-factory/internal/schematic"
 	schematiccache "github.com/siderolabs/image-factory/internal/schematic/storage/cache"
@@ -197,11 +198,29 @@ func RunFactory(ctx context.Context, logger *zap.Logger, opts Options) error {
 }
 
 func buildQueueBroker(logger *zap.Logger, opts Options) (queue.Broker, error) {
-	broker, err := rabbitmq.New(logger, rabbitmq.Options{
-		URL:            opts.Queue.URL,
-		RequestQueue:   opts.Queue.RequestQueue,
-		ResultExchange: opts.Queue.ResultExchange,
-	})
+	backend, err := opts.Queue.Backend()
+	if err != nil {
+		return nil, err
+	}
+
+	var broker queue.Broker
+
+	switch backend {
+	case QueueBackendValkey:
+		broker, err = valkey.New(logger, valkey.Options{
+			URL:             opts.Queue.URL,
+			RequestQueue:    opts.Queue.RequestQueue,
+			ResultExchange:  opts.Queue.ResultExchange,
+			RecoveryTimeout: opts.Queue.RecoveryTimeout,
+		})
+	default:
+		broker, err = rabbitmq.New(logger, rabbitmq.Options{
+			URL:            opts.Queue.URL,
+			RequestQueue:   opts.Queue.RequestQueue,
+			ResultExchange: opts.Queue.ResultExchange,
+		})
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize build queue: %w", err)
 	}

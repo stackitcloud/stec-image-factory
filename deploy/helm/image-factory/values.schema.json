@@ -261,6 +261,36 @@
               }
             }
           }
+        },
+        "valkey": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "description": "Deploy a Valkey server",
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              }
+            },
+            "nodeSelector": {
+              "type": "object"
+            },
+            "password": {
+              "description": "Valkey password",
+              "type": "string"
+            },
+            "resources": {
+              "type": "object"
+            }
+          }
         }
       }
     },
@@ -517,7 +547,7 @@
       "type": "object"
     },
     "queue": {
-      "description": "Horizontal scaling: build assets on a pool of workers. With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend and publish a build request to RabbitMQ for every asset missing in the cache. The replicas of the worker Deployment build the assets and push them to the cache. Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas.",
+      "description": "Horizontal scaling: build assets on a pool of workers. With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend and publish a build request to the queue (RabbitMQ or Valkey) for every asset missing in the cache. The replicas of the worker Deployment build the assets and push them to the cache. Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas.",
       "type": "object",
       "properties": {
         "enabled": {
@@ -525,11 +555,11 @@
           "type": "boolean"
         },
         "existingSecret": {
-          "description": "Name of an existing Secret containing the AMQP URL in the data key \"url\". Takes precedence over `queue.url`.",
+          "description": "Name of an existing Secret containing the queue URL in the data key \"url\". Takes precedence over `queue.url`.",
           "type": "string"
         },
         "url": {
-          "description": "AMQP URL of the RabbitMQ server, e.g. amqp://user:password@rabbitmq:5672/. It is stored in a Secret. Defaults to the bundled RabbitMQ if `demo.rabbitmq.enabled` is set.",
+          "description": "URL of the queue server: RabbitMQ (amqp://user:password@rabbitmq:5672/) or Valkey (valkey://user:password@valkey:6379/0). It is stored in a Secret. Defaults to the bundled server if `demo.rabbitmq.enabled` or `demo.valkey.enabled` is set.",
           "type": "string"
         }
       }

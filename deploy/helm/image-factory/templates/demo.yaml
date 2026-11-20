@@ -1,5 +1,5 @@
 {{- /*
-Bundled dependencies for demos, tests and benchmarks: a RabbitMQ server, an OCI registry
+Bundled dependencies for demos, tests and benchmarks: a RabbitMQ or Valkey server, an OCI registry
 and a pull-through registry mirror. They are single replicas without TLS, with static
 credentials - do not use them in production.
 */ -}}
@@ -212,6 +212,86 @@ spec:
     - name: management
       port: 15672
       targetPort: management
+  selector:
+    {{- include "image-factory.demo.selectorLabels" $ctx | nindent 4 }}
+{{- end }}
+{{- if .Values.demo.valkey.enabled }}
+{{- $ctx := dict "root" . "component" "valkey" }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+type: Opaque
+stringData:
+  VALKEY_PASSWORD: {{ .Values.demo.valkey.password | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "image-factory.demo.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.demo.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "image-factory.demo.labels" $ctx | nindent 8 }}
+    spec:
+      containers:
+        - name: valkey
+          image: "{{ .Values.demo.valkey.image.repository }}:{{ .Values.demo.valkey.image.tag }}"
+          args: ["--requirepass", "$(VALKEY_PASSWORD)", "--appendonly", "yes"]
+          envFrom:
+            - secretRef:
+                name: {{ include "image-factory.fullname" . }}-valkey
+          ports:
+            - name: valkey
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: valkey
+          {{- with .Values.demo.valkey.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- with .Values.demo.valkey.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "image-factory.fullname" . }}-valkey
+  namespace: {{ include "image-factory.namespace" . }}
+  labels:
+    {{- include "image-factory.demo.labels" $ctx | nindent 4 }}
+spec:
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
   selector:
     {{- include "image-factory.demo.selectorLabels" $ctx | nindent 4 }}
 {{- end }}

@@ -545,16 +545,16 @@ extraObjects: []
 
 # -- Horizontal scaling: build assets on a pool of workers.
 # With `queue.enabled`, the replicas of the main Deployment only serve the HTTP frontend
-# and publish a build request to RabbitMQ for every asset missing in the cache. The
+# and publish a build request to the queue (RabbitMQ or Valkey) for every asset missing in the cache. The
 # replicas of the worker Deployment build the assets and push them to the cache.
 # Requires `config.cache` and `config.artifacts.schematic` to point to storage shared by all replicas.
 queue:
   # -- Split the Image Factory into frontend and worker replicas.
   enabled: false
-  # -- AMQP URL of the RabbitMQ server, e.g. amqp://user:password@rabbitmq:5672/. It is stored in a Secret.
-  # Defaults to the bundled RabbitMQ if `demo.rabbitmq.enabled` is set.
+  # -- URL of the queue server: RabbitMQ (amqp://user:password@rabbitmq:5672/) or Valkey (valkey://user:password@valkey:6379/0).
+  # It is stored in a Secret. Defaults to the bundled server if `demo.rabbitmq.enabled` or `demo.valkey.enabled` is set.
   url: ""
-  # -- Name of an existing Secret containing the AMQP URL in the data key "url". Takes precedence over `queue.url`.
+  # -- Name of an existing Secret containing the queue URL in the data key "url". Takes precedence over `queue.url`.
   existingSecret: ""
 
 # -- Worker Deployment, only used when `queue.enabled` is set.
@@ -613,6 +613,17 @@ demo:
     # -- RabbitMQ user
     username: image-factory
     # -- RabbitMQ password
+    password: image-factory
+    resources: {}
+    nodeSelector: {}
+  # Valkey server for `queue`, an alternative to RabbitMQ
+  valkey:
+    # -- Deploy a Valkey server
+    enabled: false
+    image:
+      repository: valkey/valkey
+      tag: "8"
+    # -- Valkey password
     password: image-factory
     resources: {}
     nodeSelector: {}
